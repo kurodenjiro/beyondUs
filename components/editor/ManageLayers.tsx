@@ -425,7 +425,7 @@ export const ManageLayers = () => {
         []
     );
 
-    // Hydrate from DB
+    // Hydrate from DB with Auto-Layout
     useEffect(() => {
         const fetchProject = async () => {
             if (!projectId) return;
@@ -448,40 +448,118 @@ export const ManageLayers = () => {
                 const data = await response.json();
                 console.log("Hydrating project from DB:", data);
                 setProjectPrompt(data.prompt || '');
+                setNfts(data.nfts || []);
 
                 if (data.layers && Array.isArray(data.layers)) {
-                    const newNodes: Node[] = data.layers.map((layer: any, index: number) => {
-                        console.log(`🔄 Hydrating layer "${layer.name}":`, {
-                            traits: layer.traits,
-                            position: layer.position
+                    // 1. Convert to Graph Nodes first (without positions)
+                    const rawNodes = data.layers.map((layer: any, index: number) => ({
+                        id: `ai-${index}`,
+                        name: layer.name,
+                        parentLayer: layer.parentLayer,
+                        params: layer
+                    }));
+
+                    // 2. Build Hierarchy Tree
+                    const buildTree = (nodes: any[]) => {
+                        const nodeMap = new Map(nodes.map(n => [n.name, { ...n, children: [] }]));
+                        const roots: any[] = [];
+
+                        nodes.forEach(node => {
+                            if (!node.parentLayer || node.parentLayer === "") {
+                                roots.push(nodeMap.get(node.name));
+                            } else {
+                                const parent = nodeMap.get(node.parentLayer);
+                                if (parent) {
+                                    parent.children.push(nodeMap.get(node.name));
+                                } else {
+                                    // Fallback for orphan nodes
+                                    roots.push(nodeMap.get(node.name));
+                                }
+                            }
+                        });
+                        return roots;
+                    };
+
+                    const treeRoots = buildTree(rawNodes);
+
+                    // 3. Calculate Layout Recursive
+                    const calculatedNodes: Node[] = [];
+                    // Spacing constants
+                    const X_GAP = 400;
+                    const Y_GAP = 300;
+
+                    const traverse = (node: any, depth: number, startY: number): number => {
+                        // Calculate total height of this subtree to center parent
+                        let childTotalHeight = 0;
+
+                        if (node.children.length === 0) {
+                            childTotalHeight = Y_GAP;
+                        } else {
+                            node.children.forEach((child: any) => {
+                                // Accumulate height from children subtrees
+                                // We need to dry-run or calculate height first. 
+                                // Simple approach: just stack children equally
+                            });
+                        }
+
+                        // Second pass approach:
+                        // Just assign Y based on cumulative sibling index for now, simpler
+                        return 0;
+                    }
+
+                    // Simpler Tree Layout:
+                    // Just count global Y index for leaf placement, or simple recursive stack
+                    let globalY = 100;
+
+                    const layoutNode = (node: any, x: number, yOffset: number) => {
+                        const myY = yOffset;
+
+                        // Push React Node
+                        calculatedNodes.push({
+                            id: node.id,
+                            type: 'customLayer',
+                            position: { x: x, y: myY },
+                            data: {
+                                label: node.params.name,
+                                traits: node.params.traits,
+                                description: node.params.description,
+                                parentLayer: node.params.parentLayer,
+                                rarity: node.params.rarity,
+                                position: node.params.position || { x: 0, y: 0, width: 1024, height: 1024 }
+                            }
                         });
 
-                        return {
-                            id: `ai-${index}`,
-                            type: 'customLayer',
-                            // Use AI Position if available, else fallback to HORIZONTAL grid
-                            position: layer.position ? { x: layer.position.x, y: layer.position.y } : { x: 50 + (index * 350), y: 250 },
-                            data: {
-                                label: layer.name,
-                                traits: layer.traits, // Pass full traits array
-                                description: layer.description,
-                                parentLayer: layer.parentLayer, // Store parent layer name
-                                rarity: layer.rarity,
-                                position: layer.position ? {
-                                    x: layer.position.x ?? 0,
-                                    y: layer.position.y ?? 0,
-                                    width: layer.position.width ?? 1024,
-                                    height: layer.position.height ?? 1024
-                                } : { x: 0, y: 0, width: 1024, height: 1024 }
-                            }
-                        };
+                        // Layout Children
+                        if (node.children.length > 0) {
+                            // Center children vertically relative to parent if possible,
+                            // OR just stack them to the right
+
+                            // Calculate child block height
+                            // This simple logic stacks children centered around parent Y
+                            const effectiveHeight = Math.max(node.children.length * Y_GAP, Y_GAP);
+                            let startChildY = myY - (effectiveHeight / 2) + (Y_GAP / 2);
+
+                            // Adjust startChildY to avoid overlapping with previous placed nodes?
+                            // For this simple ver, let's just use strict tree spacing relative to parent
+
+                            node.children.forEach((child: any, i: number) => {
+                                layoutNode(child, x + X_GAP, startChildY + (i * Y_GAP));
+                            });
+                        }
+                    };
+
+                    // Execute Layout
+                    let rootY = 300;
+                    treeRoots.forEach((root, i) => {
+                        // Spacing between separate trees (like logical islands)
+                        layoutNode(root, 100, rootY + (i * 600));
                     });
 
-                    // Create edges based on parentLayer relationships
+
+                    // Create edges
                     const newEdges: Edge[] = [];
                     data.layers.forEach((layer: any, index: number) => {
                         if (layer.parentLayer && layer.parentLayer !== '') {
-                            // Find the parent node
                             const parentIndex = data.layers.findIndex((l: any) => l.name === layer.parentLayer);
                             if (parentIndex !== -1) {
                                 newEdges.push({
@@ -490,12 +568,13 @@ export const ManageLayers = () => {
                                     target: `ai-${index}`,
                                     animated: true,
                                     style: { stroke: '#00F5FF' },
+                                    type: 'smoothstep' // Better for tree layout
                                 });
                             }
                         }
                     });
 
-                    setNodes(newNodes);
+                    setNodes(calculatedNodes);
                     setEdges(newEdges);
                 }
             } catch (e) {

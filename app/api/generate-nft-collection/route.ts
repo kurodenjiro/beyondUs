@@ -232,7 +232,7 @@ CRITICAL: Output must look like a single, unified character design.`;
         },
         config: {
             seed: Date.now() % 2147483647,
-            temperature: 0.3
+            temperature: 0.1
         }
     });
 
@@ -356,12 +356,12 @@ export async function POST(request: NextRequest) {
 
         // 3. Add other accessory layers attached to Body
         const accessoryCategories = ["clothing", "accessory", "headwear", "eyewear"];
-        
+
         accessoryCategories.forEach(category => {
             const categoryTraits = generatedTraits.filter(t => t.category === category);
             if (categoryTraits.length > 0) {
                 const displayName = category.charAt(0).toUpperCase() + category.slice(1);
-                
+
                 layerMap.set(displayName, {
                     name: displayName,
                     parentLayer: "Body",
