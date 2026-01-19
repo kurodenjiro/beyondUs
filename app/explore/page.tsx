@@ -17,7 +17,7 @@ export default function ExplorePage() {
         try {
             // Fetch ALL published collections
             // Note: We need to update the API to support fetching published status without ownerAddress filtering or specific owner = "published"
-            const res = await fetch(`/api/collections?status=published`);
+            const res = await fetch(`/api/projects?status=published`);
             if (res.ok) {
                 const data = await res.json();
                 setCollections(data);

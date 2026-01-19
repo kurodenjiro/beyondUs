@@ -26,7 +26,7 @@ export default function CollectionsPage() {
 
     const fetchCollections = async () => {
         try {
-            const res = await fetch(`/api/collections?ownerAddress=${address}`);
+            const res = await fetch(`/api/projects?ownerAddress=${address}`);
             if (res.ok) {
                 const data = await res.json();
                 setCollections(data);
