@@ -151,7 +151,8 @@ Strict Constraints:
 3. Perspective Alignment: Adjust the angle and perspective of each trait to match the character's position.
 
 4. Proper Layering: Apply traits in the correct order:
-   - Clothing: Base layer, follows torso contour
+   - Background: Bottom layer, behind character
+   - Clothing: Base layer on character, follows torso contour
    - Accessories: Mid layer, positioned naturally
    - Headwear: Sits on head, behind ears but over forehead
    - Eyewear: Top layer, aligned with eyes and face
