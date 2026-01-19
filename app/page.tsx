@@ -140,17 +140,24 @@ export default function Home() {
           />
           <div className="flex items-center gap-2 px-2">
             <button
-              onClick={() => {
-                const prompts = [
-                  "A collection NFT of cyberpunk PFP NFT",
-                  "A collection NFT of anime PFP NFT",
-                  "A collection NFT of Rick and Morty PFP NFT",
-                  "A collection NFT of Ghibi NFT",
-                ];
-                setPrompt(prompts[Math.floor(Math.random() * prompts.length)]);
+              onClick={async () => {
+                if (isGenerating) return;
+                const btn = document.getElementById('suggest-btn');
+                if (btn) btn.classList.add('animate-pulse');
+
+                try {
+                  const res = await fetch('/api/suggest', { method: 'POST' });
+                  const data = await res.json();
+                  if (data.prompt) setPrompt(data.prompt);
+                } catch (e) {
+                  console.error("Suggest failed", e);
+                } finally {
+                  if (btn) btn.classList.remove('animate-pulse');
+                }
               }}
+              id="suggest-btn"
               className="p-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-muted-foreground hover:text-white flex items-center gap-2"
-              title="Recommend a prompt"
+              title="Get a creative AI suggestion"
             >
               <Sparkles className="w-5 h-5" />
               <span className="hidden md:inline text-sm font-medium">Suggest</span>

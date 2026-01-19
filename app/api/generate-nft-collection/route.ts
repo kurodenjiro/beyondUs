@@ -193,27 +193,42 @@ Input Data:
 
 Image 1 (The Sample): This is the base character. You must preserve its pose, proportions, art style, line weight, and overall composition exactly.
 
-${traits.map((_, idx) => `Image ${idx + 2} (${traits[idx].category}): Trait to be added`).join("\n")}
+${traits.map((t, idx) => `Image ${idx + 2} (${t.category}): Trait to be added`).join("\n")}
 
-Objective: Composite ALL trait images onto the base character in a single, cohesive design.
+Objective: Composite ALL trait images onto the base character in a single, cohesive design. The resulting output should look like the character from Image 1 is naturally wearing/holding all the items.
 
 Traits to Apply:
 ${traitList}
 
 Strict Constraints:
-1. Do Not Alter the Sample
-2. Style Consistency
-3. Perspective Alignment
-4. Proper Layering:
-   - Background: Bottom layer, behind character
-   - Clothing: Base layer on character
-   - Accessories: Mid layer
-   - Headwear: Sits on head
-   - Eyewear: Top layer
-5. Technical Style: Maintain thick black outlines and flat cel-shading
-6. Background: Keep same solid background color
 
-CRITICAL: Output must look like a single, unified character design.`;
+1. Do Not Alter the Sample: The character's face, body shape, pose, and existing features from Image 1 must remain unchanged.
+
+2. Style Consistency: Render ALL traits using the exact same artistic style, shading, and color palette found in Image 1.
+
+3. Perspective Alignment: Adjust the angle and perspective of each trait to match the character's position.
+
+4. Proper Layering: Apply traits in the correct order:
+   - Background: Bottom layer, behind character
+   - Clothing: Base layer on character, follows torso contour
+   - Accessories: Mid layer, positioned naturally
+   - Headwear: Sits on head, behind ears but over forehead
+   - Eyewear: Top layer, aligned with eyes and face
+
+5. Technical Style: Maintain the thick black outlines and flat cel-shading present in the sample.
+
+6. Background: Keep the same solid background color from Image 1.
+
+7. Natural Integration: Each trait should look like it was always part of the original character design.
+
+Task: Generate the final composite image where ALL traits are seamlessly integrated into the base character in a single, cohesive design.
+
+Tips for Better Results:
+- Focus specifically on how each trait type should be positioned
+- Maintain the thick black outlines and flat cel-shading present in the sample
+- Render the output with the same solid background color
+
+CRITICAL: The output must look like a single, unified character design, not a collage. All traits should appear as if they were always part of the original character.`;
 
     const parts: any[] = [
         { text: prompt },
@@ -232,7 +247,7 @@ CRITICAL: Output must look like a single, unified character design.`;
         },
         config: {
             seed: Date.now() % 2147483647,
-            temperature: 0.1
+            temperature: 0.1 // Increased slightly from 0.1 for better blending
         }
     });
 
