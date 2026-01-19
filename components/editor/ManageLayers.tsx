@@ -35,11 +35,24 @@ const CustomLayerNode = ({ data }: { data: { label: string, traits: any[], onSet
                 <Settings className="w-3 h-3 text-muted-foreground group-hover:text-white transition-colors" />
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+            <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
                 {data.traits && data.traits.map((trait: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-[10px] bg-white/5 p-1.5 rounded border border-white/5">
-                        <span className="text-gray-300 truncate max-w-[100px]">{trait.name}</span>
-                        <span className="font-mono text-primary/80">{trait.rarity}%</span>
+                    <div key={i} className="flex items-center gap-2 bg-white/5 p-1.5 rounded border border-white/5 group/trait">
+                        {trait.imageUrl ? (
+                            <div className="w-8 h-8 shrink-0 rounded-sm overflow-hidden bg-black/50 border border-white/10">
+                                <img src={trait.imageUrl} alt={trait.name} className="w-full h-full object-cover" />
+                            </div>
+                        ) : (
+                            <div className="w-8 h-8 shrink-0 rounded-sm bg-white/10 flex items-center justify-center">
+                                <span className="text-[8px] text-muted-foreground">AG</span>
+                            </div>
+                        )}
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-medium text-gray-300 truncate" title={trait.name}>{trait.name}</span>
+                                <span className="text-[9px] font-mono text-primary/80">{trait.rarity}%</span>
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -74,7 +87,6 @@ const initialEdges: Edge[] = [
 ];
 
 import { LayerSettingsModal } from './LayerSettingsModal';
-import { SaveCollectionModal } from './SaveCollectionModal';
 import { useSimpleWallet } from '@/components/providers/SimpleWalletProvider';
 
 export const ManageLayers = () => {
@@ -95,78 +107,73 @@ export const ManageLayers = () => {
     const [isRearranging, setIsRearranging] = useState(false);
     const [selectedTraits, setSelectedTraits] = useState<Record<string, number>>({});
 
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isSavingCollection, setIsSavingCollection] = useState(false);
 
     // Modal State - Moved to top to avoid Hooks Order Violation
-    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-    const [previewToSave, setPreviewToSave] = useState<string | null>(null);
 
-    // Canvas Rendering Effect
+    const [nfts, setNfts] = useState<any[]>([]);
+
+    // Hydrate from DB
     useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+        const fetchProject = async () => {
+            if (!projectId) return;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Set canvas size
-        canvas.width = 1024;
-        canvas.height = 1024;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Helper to load images
-        const loadImage = (src: string): Promise<HTMLImageElement> => {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = reject;
-                img.crossOrigin = 'anonymous';
-                img.src = src;
-            });
-        };
-
-        // Render character
-        const renderCharacter = async () => {
+            setIsLoading(true);
             try {
-                // Get layers sorted by depth (parent below child)
-                const layersToRender = nodes
-                    .filter(n => n.data.traits?.some((t: any) => t.imageUrl))
-                    .sort((a, b) => getLayerDepth(a, nodes) - getLayerDepth(b, nodes));
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    headers: { 'x-wallet-address': address || '' }
+                });
 
-                // Draw each layer in order
-                for (const node of layersToRender) {
-                    const traitIndex = selectedTraits[node.id] || 0;
-                    const trait = node.data.traits?.[traitIndex]?.imageUrl
-                        ? node.data.traits[traitIndex]
-                        : node.data.traits?.find((t: any) => t.imageUrl);
+                if (response.status === 403) return;
+                if (!response.ok) throw new Error("Failed to load project");
 
-                    if (!trait?.imageUrl) continue;
+                const data = await response.json();
+                console.log("Hydrating project:", data);
+                setProjectPrompt(data.prompt || '');
+                setNfts(data.nfts || []);
 
-                    // Load image
-                    const img = await loadImage(trait.imageUrl);
+                if (data.layers && Array.isArray(data.layers)) {
+                    const newNodes: Node[] = data.layers.map((layer: any, index: number) => ({
+                        id: `ai-${index}`,
+                        type: 'customLayer',
+                        position: layer.position ? { x: layer.position.x, y: layer.position.y } : { x: 50 + (index * 350), y: 250 },
+                        data: {
+                            label: layer.name,
+                            traits: layer.traits,
+                            description: layer.description,
+                            parentLayer: layer.parentLayer,
+                            rarity: layer.rarity,
+                            position: layer.position || { x: 0, y: 0, width: 1024, height: 1024 }
+                        }
+                    }));
 
-                    // Get position from trait or node data
-                    const pos = trait.position || node.data.position || { x: 0, y: 0, width: 1024, height: 1024 };
+                    const newEdges: Edge[] = [];
+                    data.layers.forEach((layer: any, index: number) => {
+                        if (layer.parentLayer && layer.parentLayer !== '') {
+                            const parentIndex = data.layers.findIndex((l: any) => l.name === layer.parentLayer);
+                            if (parentIndex !== -1) {
+                                newEdges.push({
+                                    id: `e-${parentIndex}-${index}`,
+                                    source: `ai-${parentIndex}`,
+                                    target: `ai-${index}`,
+                                    animated: true,
+                                    style: { stroke: '#00F5FF' },
+                                });
+                            }
+                        }
+                    });
 
-                    // Draw at specified position
-                    ctx.drawImage(
-                        img,
-                        pos.x,
-                        pos.y,
-                        pos.width,
-                        pos.height
-                    );
+                    setNodes(newNodes);
+                    setEdges(newEdges);
                 }
-            } catch (err) {
-                console.error("Error rendering character:", err);
+            } catch (e) {
+                console.error("Failed to fetch project:", e);
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        renderCharacter();
-    }, [nodes, selectedTraits]); // Re-render when nodes or selection changes
+        fetchProject();
+    }, [projectId, address]);
 
     // Calculate Layer Depth for proper stacking
     const getLayerDepth = (node: Node, allNodes: Node[]): number => {
@@ -177,20 +184,7 @@ export const ManageLayers = () => {
         return 1 + getLayerDepth(parent, allNodes);
     };
 
-    const handleRandomizeMix = () => {
-        const newSelectedTraits: Record<string, number> = {};
-        nodes.forEach(node => {
-            const traitsWithImages = node.data.traits
-                ?.map((t: any, idx: number) => ({ ...t, originalIndex: idx }))
-                .filter((t: any) => t.imageUrl) || [];
 
-            if (traitsWithImages.length > 0) {
-                const randomIdx = Math.floor(Math.random() * traitsWithImages.length);
-                newSelectedTraits[node.id] = traitsWithImages[randomIdx].originalIndex;
-            }
-        });
-        setSelectedTraits(newSelectedTraits);
-    };
 
     const handleSettingsClick = (nodeId: string, layerData: any) => {
         setSelectedNodeId(nodeId);
@@ -209,7 +203,6 @@ export const ManageLayers = () => {
             const canvas = document.createElement('canvas');
             canvas.width = 1024;
             canvas.height = 1024;
-            const ctx = canvas.getContext('2d');
 
             if (!ctx) throw new Error('Failed to get canvas context');
 
@@ -534,54 +527,9 @@ export const ManageLayers = () => {
 
 
 
-    const handleSaveCollectionClick = async () => {
-        if (!canvasRef.current) return;
-        const preview = canvasRef.current.toDataURL('image/png');
-        setPreviewToSave(preview);
-        setIsSaveModalOpen(true);
-    };
+    const handleSaveCollectionClick = async () => { };
+    const confirmSaveCollection = async () => { };
 
-    const confirmSaveCollection = async (name: string) => {
-        if (!projectId || !previewToSave) return;
-
-        try {
-            setIsSavingCollection(true);
-
-            // 1. Save Project Details
-            const response = await fetch(`/api/projects/${projectId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    status: 'saved',
-                    previewImage: previewToSave
-                })
-            });
-
-            if (!response.ok) throw new Error("Failed to save collection");
-
-            // 2. Trigger NFT Generation
-            console.log("Triggering NFT generation...");
-            const genResponse = await fetch(`/api/projects/${projectId}/generate`, {
-                method: 'POST'
-            });
-
-            if (!genResponse.ok) {
-                console.warn("NFT generation failed, but collection saved.");
-            } else {
-                const genData = await genResponse.json();
-                console.log(`✅ Generated ${genData.count} NFTs`);
-            }
-
-            // alert("✅ Collection saved successfully! You can view it in the Collections page.");
-            setIsSaveModalOpen(false);
-        } catch (error) {
-            console.error("Failed to save collection:", error);
-            // alert("❌ Failed to save collection. Please try again.");
-        } finally {
-            setIsSavingCollection(false);
-        }
-    };
 
     return (
         <>
@@ -628,49 +576,43 @@ export const ManageLayers = () => {
                         }}
                     />
                 </ReactFlow>
-
             </div>
 
-            {/* Combined Preview Section */}
+            {/* Generated Collection Section */}
             <div className="mt-8 p-6 bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
                             <ImageIcon className="w-5 h-5 text-primary" />
-                            Live Composite Preview
+                            Generated Collection
                         </h2>
                         <p className="text-xs text-muted-foreground mt-1 font-mono uppercase tracking-widest">
-                            {totalCombinations.toLocaleString()} Possible Combinations
+                            {nfts.length} Items
                         </p>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={handleSaveCollectionClick}
-                            disabled={isSavingCollection}
-                            className="flex items-center gap-2 px-6 py-2 bg-primary text-black rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(0,245,255,0.3)] hover:shadow-[0_0_25px_rgba(0,245,255,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isSavingCollection ? <span className="animate-spin mr-1">⏳</span> : <Sparkles className="w-4 h-4" />}
-                            {isSavingCollection ? 'Saving...' : 'Save Collection'}
-                        </button>
+                </div>
 
-                        <button
-                            onClick={handleRandomizeMix}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg text-primary text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(0,245,255,0.1)]"
-                        >
-                            <Dices className="w-4 h-4" />
-                            Random Mixed
-                        </button>
-                        <span className="text-xs font-mono text-muted-foreground bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                            {nodes.filter(n => n.data.traits?.some((t: any) => t.imageUrl)).length} Layers in Mix
-                        </span>
-                    </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {nfts.map((nft) => (
+                        <div key={nft.id} className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-primary transition-all">
+                            <img src={nft.image} alt={nft.name} className="w-full h-auto aspect-square object-cover" />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-2 translate-y-full group-hover:translate-y-0 transition-transform">
+                                <p className="text-xs font-bold text-white">{nft.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{nft.description}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {nfts.length === 0 && (
+                        <div className="col-span-full py-12 text-center text-muted-foreground">
+                            No NFTs generated yet.
+                        </div>
+                    )}
                 </div>
 
                 {/* SVG Filter for Luma Key (White to Transparent) */}
                 <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }} aria-hidden="true">
                     <defs>
                         <filter id="luma-key" colorInterpolationFilters="sRGB">
-                            {/* 1. Detect White pixels and turn them into Alpha mask */}
                             <feColorMatrix
                                 type="matrix"
                                 values="
@@ -680,111 +622,19 @@ export const ManageLayers = () => {
                                     -5 -5 -5 1 14"
                                 result="mask"
                             />
-                            {/* 2. Use the mask to 'cut' the original image (SourceIn) */}
                             <feComposite in="SourceGraphic" in2="mask" operator="in" />
                         </filter>
                     </defs>
                 </svg>
 
-                <div className="flex flex-col md:flex-row gap-10 items-start">
-                    {/* Big Picture */}
-                    <div className="relative w-80 h-80 bg-white rounded-2xl border-2 border-white/10 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] group">
-
-                        {/* Canvas for Character Assembly */}
-                        <canvas
-                            ref={canvasRef}
-                            className="absolute inset-0 w-full h-full"
-                            style={{ imageRendering: 'crisp-edges' }}
-                        />
-
-                        {nodes.every(n => !n.data.traits?.some((t: any) => t.imageUrl)) && (
-                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm font-mono px-8 text-center bg-black/40">
-                                <div>
-                                    <p>Ready to combine</p>
-                                    <p className="text-[10px] mt-2 opacity-50">Generate images in the layers above</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Composite Order</span>
-                            <div className="flex gap-1 mt-1">
-                                {nodes.sort((a, b) => getLayerDepth(a, nodes) - getLayerDepth(b, nodes)).map((n, i) => (
-                                    <div key={n.id} className="w-2 h-2 rounded-full bg-primary" style={{ opacity: (i + 1) / nodes.length }} />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Layer & Trait Selector */}
-                    <div className="flex-1 space-y-4">
-                        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Mixing Panel</h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {nodes.map((node) => {
-                                const currentTraitIndex = selectedTraits[node.id] || 0;
-                                const hasImages = node.data.traits?.some((t: any) => t.imageUrl);
-
-                                return (
-                                    <div key={node.id} className="group p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all flex flex-col gap-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[11px] uppercase font-bold text-white tracking-widest group-hover:text-primary transition-colors">
-                                                {node.data.label}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground font-mono">
-                                                {node.data.traits?.filter((t: any) => t.imageUrl).length || 0} Assets
-                                            </span>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            {node.data.traits?.map((trait: any, idx: number) => (
-                                                <button
-                                                    key={idx}
-                                                    disabled={!trait.imageUrl}
-                                                    onClick={() => setSelectedTraits(prev => ({ ...prev, [node.id]: idx }))}
-                                                    className={cn(
-                                                        "relative w-12 h-12 rounded-lg border-2 transition-all overflow-hidden",
-                                                        !trait.imageUrl ? "border-transparent opacity-20 cursor-not-allowed" :
-                                                            currentTraitIndex === idx ? "border-primary shadow-[0_0_10px_rgba(0,245,255,0.3)] scale-105" :
-                                                                "border-white/10 hover:border-white/30"
-                                                    )}
-                                                >
-                                                    {trait.imageUrl && (
-                                                        <img src={trait.imageUrl} className="w-full h-full object-cover" />
-                                                    )}
-                                                    {currentTraitIndex === idx && trait.imageUrl && (
-                                                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            ))}
-                                            {!hasImages && (
-                                                <div className="text-[10px] text-white/20 font-mono py-2">No assets generated</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
+                <LayerSettingsModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    layerData={selectedLayer}
+                    onSave={handleSaveSettings}
+                    availableLayers={nodes.map(n => n.data.label)}
+                />
             </div>
-
-            <LayerSettingsModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                layerData={selectedLayer}
-                onSave={handleSaveSettings}
-                availableLayers={nodes.map(n => n.data.label)}
-            />
-
-            <SaveCollectionModal
-                isOpen={isSaveModalOpen}
-                onClose={() => setIsSaveModalOpen(false)}
-                onSave={confirmSaveCollection}
-                previewImage={previewToSave}
-                isSaving={isSavingCollection}
-            />
         </>
     );
 };

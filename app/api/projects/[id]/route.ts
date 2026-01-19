@@ -10,6 +10,7 @@ export async function GET(
     try {
         const project = await prisma.project.findUnique({
             where: { id },
+            include: { nfts: true },
         });
 
         if (!project) {

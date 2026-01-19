@@ -27,266 +27,34 @@ export default function Home() {
 
   const [status, setStatus] = useState<string>("");
 
-  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
 
-  const handleAutoGenerate = async () => {
-    if (!prompt) return;
-    setIsAutoGenerating(true);
-    setStatus("Planning Collection...");
-
-    try {
-      // 1. Payment Flow (Reuse existing)
-      const { success, paymentHeader, error } = await mintCollection({ prompt });
-      if (!success || !paymentHeader) {
-        console.error("Payment failed", error);
-        setStatus(error || "Payment Failed");
-        return;
-      }
-
-      // 2. Plan Collection (Get Manifest)
-      setStatus("Designing Traits...");
-      const planRes = await fetch('/api/plan-collection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ prompt })
-      });
-
-      if (!planRes.ok) throw new Error("Failed to plan collection");
-      const { manifest, rawPlan } = await planRes.json();
-      console.log("✅ Collection Plan:", manifest);
-
-      // 3. Extract Unique Traits for Sprite Prompt
-      const uniqueTraits: Record<string, Set<string>> = {};
-      const knownAttributes: any[] = [];
-
-      manifest.forEach((char: any) => {
-        char.attributes.forEach((attr: any) => {
-          if (!uniqueTraits[attr.trait_type]) {
-            uniqueTraits[attr.trait_type] = new Set();
-          }
-          if (!uniqueTraits[attr.trait_type].has(attr.value)) {
-            uniqueTraits[attr.trait_type].add(attr.value);
-            knownAttributes.push({
-              name: attr.value,
-              category: attr.trait_type
-            });
-          }
-        });
-      });
-
-      // Construct Prompt using JSON Manifest
-      let spritePrompt = JSON.stringify(manifest, null, 2);
-
-
-      console.log("🎨 Sprite Prompt:", spritePrompt);
-
-      // 4. Generate Image (Direct)
-      setStatus("Generating Assets...");
-      const spriteResponse = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ prompt: spritePrompt })
-      });
-
-      if (!spriteResponse.ok) throw new Error("Failed to generate assets");
-      const { url: spriteSheetUrl } = await spriteResponse.json();
-
-      // 5. Extract Traits (Crop Characters)
-      setStatus("Extracting Characters...");
-      const extractResponse = await fetch('/api/extract-traits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ imageData: spriteSheetUrl })
-      });
-
-      if (!extractResponse.ok) throw new Error("Failed to extract parts");
-      const { traits: extractedTraits } = await extractResponse.json();
-      console.log(`✅ Extracted ${extractedTraits.length} characters`);
-
-      // 6. Map Extracted Images to Manifest (Skip Analysis)
-      setStatus("Saving Collection...");
-
-      const layerMap = new Map<string, any>();
-      const collectionLayerName = "Collection";
-
-      layerMap.set(collectionLayerName, {
-        name: collectionLayerName,
-        parentLayer: "",
-        position: { x: 0, y: 0, width: 1024, height: 1024 },
-        aiPrompt: `Collection of ${prompt}`,
-        traits: []
-      });
-
-      // Optimistic matching: Assume left-to-right extraction matches plan order
-      // Limit to whichever is smaller to avoid index errors
-      const count = Math.min(extractedTraits.length, manifest.length);
-
-      for (let i = 0; i < count; i++) {
-        const charPlan = manifest[i];
-        const croppedImage = extractedTraits[i];
-
-        layerMap.get(collectionLayerName)!.traits.push({
-          name: charPlan.name || `Character #${i + 1}`,
-          rarity: 100 / count, // Distributed rarity
-          imageUrl: croppedImage.imageUrl,
-          description: charPlan.description || "Generated Character",
-          anchorPoints: { top: false, bottom: false, left: false, right: false },
-          // Store raw attributes in description for now, as Trait doesn't have metadata field yet
-          // formatting as JSON string in description might be useful
-          attributes: charPlan.attributes
-        });
-      }
-
-      const layers = Array.from(layerMap.values());
-
-      setStatus("Saving Project...");
-      const saveResponse = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt, // Original prompt
-          layers,
-          ownerAddress: address,
-          name: `${prompt} Collection`
-        })
-      });
-
-      if (!saveResponse.ok) throw new Error("Failed to save project");
-      const { id } = await saveResponse.json();
-
-      setStatus("Redirecting...");
-      router.push(`/editor?id=${id}`);
-
-    } catch (error: any) {
-      console.error("Auto-Generate failed:", error);
-      setStatus(`Error: ${error.message}`);
-    } finally {
-      setIsAutoGenerating(false);
-    }
-  };
 
   const handleGenerate = async () => {
     if (!prompt) return;
     setIsGenerating(true);
-    setStatus("Initiating Payment...");
+    setStatus("Parsing prompt...");
 
     try {
-      // 1. Payment Flow
-      const { success, paymentHeader, error } = await mintCollection({ prompt });
-      if (!success || !paymentHeader) {
-        console.error("Payment failed", error);
-        setStatus(error || "Payment Failed");
-        return;
-      }
-
-      // 2. Generate Sprite Sheet
-      setStatus("Generating Sprite Sheet...");
-      const spriteResponse = await fetch('/api/generate-sprite-sheet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ prompt })
-      });
-
-      if (!spriteResponse.ok) throw new Error("Failed to generate sprite sheet");
-
-      const { url: spriteSheetUrl, base64: spriteSheetData } = await spriteResponse.json();
-      console.log("✅ Sprite sheet generated");
-
-      // 3. Extract Individual Traits with Sharp
-      setStatus("Extracting Traits...");
-      const extractResponse = await fetch('/api/extract-traits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ imageData: spriteSheetUrl })
-      });
-
-      if (!extractResponse.ok) throw new Error("Failed to extract traits");
-
-      const { traits: extractedTraits } = await extractResponse.json();
-      console.log(`✅ Extracted ${extractedTraits.length} traits`);
-
-      // 4. Analyze Traits with Gemini Vision
-      setStatus("Analyzing Traits...");
-      const analyzeResponse = await fetch('/api/analyze-traits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Hash': paymentHeader
-        },
-        body: JSON.stringify({ traits: extractedTraits })
-      });
-
-      if (!analyzeResponse.ok) throw new Error("Failed to analyze traits");
-
-      const { traits: analyzedTraits } = await analyzeResponse.json();
-      console.log(`✅ Analyzed ${analyzedTraits.length} traits`);
-
-      // 5. Group traits by category into layers
-      const layerMap = new Map<string, any>();
-
-      analyzedTraits.forEach((trait: any) => {
-        const layerName = trait.category || 'Other';
-        if (!layerName) {
-          console.warn('⚠️ Skipping trait with missing category:', trait);
-          return;
-        }
-
-        if (!layerMap.has(layerName)) {
-          layerMap.set(layerName, {
-            name: layerName,
-            parentLayer: getParentLayer(layerName),
-            position: getDefaultPosition(layerName),
-            aiPrompt: `A minimalist 2D flat vector nft asset of ${layerName.toLowerCase()}`,
-            traits: []
-          });
-        }
-
-        layerMap.get(layerName)!.traits.push({
-          name: trait.name,
-          rarity: trait.rarity,
-          imageUrl: trait.imageUrl,
-          description: trait.description,
-          anchorPoints: trait.anchorPoints
-        });
-      });
-
-      const layers = Array.from(layerMap.values());
-
-      // 6. Save to DB and Redirect
-      setStatus("Saving Project...");
-      const saveResponse = await fetch('/api/projects', {
+      // Call the new NFT generation workflow
+      setStatus("Generating NFT collection...");
+      const response = await fetch('/api/generate-nft-collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
-          layers,
           ownerAddress: address,
-          aspectRatio: selectedRatio,
-          upscale: selectedUpscale
+          traitsPerCategory: 2,
+          nftsToGenerate: supply
         })
       });
 
-      if (!saveResponse.ok) throw new Error("Failed to save project");
+      if (!response.ok) throw new Error("Failed to generate NFT collection");
 
-      const { id } = await saveResponse.json();
+      const result = await response.json();
+      console.log("✅ NFT Collection generated:", result);
 
-      setStatus("Redirecting to Editor...");
-      router.push(`/editor?id=${id}`);
+      setStatus("Redirecting to editor...");
+      router.push(`/editor?id=${result.projectId}`);
 
     } catch (error: any) {
       console.error("Generation failed:", error);
@@ -388,27 +156,15 @@ export default function Home() {
               <span className="hidden md:inline text-sm font-medium">Suggest</span>
             </button>
 
-            <button
-              onClick={handleAutoGenerate}
-              disabled={isGenerating || isAutoGenerating}
-              className="bg-secondary/20 hover:bg-secondary/30 text-secondary font-bold px-6 py-4 rounded-xl transition-all border border-secondary/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              title="Generate Without Traits (Auto-Plan)"
-            >
-              {isAutoGenerating ? (
-                <Sparkles className="w-5 h-5 animate-spin" />
-              ) : (
-                <Layers className="w-5 h-5" />
-              )}
-              <span className="hidden sm:inline">Auto Plan</span>
-            </button>
+
 
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || isAutoGenerating}
+              disabled={isGenerating}
               className="bg-primary hover:bg-primary/90 text-black font-bold px-8 py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(0,245,255,0.4)] hover:shadow-[0_0_30px_rgba(0,245,255,0.6)] flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className={`w-5 h-5 fill-current ${isGenerating ? 'animate-pulse' : ''}`} />
-              {isGenerating || isAutoGenerating ? (status || 'PROCESSING...') : 'GENERATE'}
+              {isGenerating ? (status || 'PROCESSING...') : 'GENERATE'}
             </button>
           </div>
         </div>
