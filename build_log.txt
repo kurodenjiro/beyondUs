@@ -1,0 +1,47 @@
+
+> temp_setup@0.1.0 build
+> prisma generate && next build
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (v7.2.0) to ./node_modules/@prisma/client in 67ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.5s
+  Running TypeScript ...
+  Collecting page data using 10 workers ...
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+Prisma Client Initialized (HMR Trigger)
+  Generating static pages using 10 workers (0/24) ...
+Prisma Client Initialized (HMR Trigger)
+  Generating static pages using 10 workers (6/24) 
+  Generating static pages using 10 workers (12/24) 
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/editor". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+    at Q (/Users/mac/dev/beyondUs/.next/server/chunks/ssr/node_modules_next_920e7746._.js:2:2111)
+    at o (/Users/mac/dev/beyondUs/.next/server/chunks/ssr/node_modules_next_920e7746._.js:4:5284)
+    at /Users/mac/dev/beyondUs/.next/server/chunks/ssr/_32d73525._.js:2:23841
+    at an (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84360)
+    at ai (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86179)
+    at ai (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104708)
+    at al (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107953)
+    at as (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105368)
+    at am (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:112882)
+    at ai (/Users/mac/dev/beyondUs/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:98808)
+Error occurred prerendering page "/editor". Read more: https://nextjs.org/docs/messages/prerender-error
+Export encountered an error on /editor/page: /editor, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null

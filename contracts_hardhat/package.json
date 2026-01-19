@@ -1,0 +1,20 @@
+{
+    "name": "beyond-us-contracts",
+    "version": "1.0.0",
+    "description": "Smart contracts for BeyondUs",
+    "main": "index.js",
+    "scripts": {
+        "test": "npx hardhat test",
+        "compile": "npx hardhat compile",
+        "deploy": "npx hardhat run scripts/deploy.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "hardhat": "^2.22.4",
+        "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "dotenv": "^16.4.5",
+        "@openzeppelin/contracts": "^5.0.2"
+    }
+}

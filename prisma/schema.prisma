@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model MediaAsset {
+  id           String      @id
+  playgroundId String?
+  key          String
+  type         String
+  mimeType     String
+  data         Bytes
+  url          String      @unique
+  createdAt    DateTime    @default(now())
+  Playground   Playground? @relation(fields: [playgroundId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([playgroundId])
+}
+
+model Playground {
+  id               String           @id
+  slug             String           @unique
+  title            String
+  summary          String
+  markdown         String
+  tags             String[]
+  price            String?
+  network          String           @default("solana-devnet")
+  resourcePath     String           @unique
+  publisherAddress String?
+  status           PlaygroundStatus @default(DRAFT)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  previews         Json?
+  MediaAsset       MediaAsset[]
+}
+
+model agent_wallets {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agent_name  String    @unique
+  public_key  String    @unique
+  private_key String
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([agent_name], map: "idx_agent_wallets_agent_name")
+  @@index([public_key], map: "idx_agent_wallets_public_key")
+}
+
+model game_plays {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id          String    @unique
+  game_state       Json?
+  stats            Json?
+  rankings         Json?
+  is_running       Boolean?  @default(false)
+  chat_messages    Json?     @default("[]")
+  simulator_status Json?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([game_id], map: "idx_game_plays_game_id")
+  @@index([updated_at], map: "idx_game_plays_updated_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lobbies {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id    String    @unique
+  config     Json
+  status     String?   @default("waiting")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([game_id], map: "idx_lobbies_game_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model payment_accounts {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id          String    @unique
+  public_key       String
+  private_key      String
+  total_amount_usd Decimal   @db.Decimal(18, 2)
+  status           String?   @default("pending")
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at], map: "idx_payment_accounts_created_at")
+  @@index([game_id], map: "idx_payment_accounts_game_id")
+  @@index([status], map: "idx_payment_accounts_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model x402_transactions {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id               String
+  hand_number           Int?
+  from_agent            String
+  to_agent              String
+  amount_chips          Int
+  amount_sol            Decimal?  @db.Decimal(18, 9)
+  transaction_signature String?
+  status                String?   @default("pending")
+  created_at            DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at], map: "idx_x402_transactions_created_at")
+  @@index([from_agent], map: "idx_x402_transactions_from_agent")
+  @@index([game_id], map: "idx_x402_transactions_game_id")
+  @@index([status], map: "idx_x402_transactions_status")
+  @@index([to_agent], map: "idx_x402_transactions_to_agent")
+}
+
+enum PlaygroundStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  ownerAddress String
+  prompt       String
+  layers       Json
+  aspectRatio  String?  @default("1:1")
+  upscale      String?  @default("Original")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  name         String?   @default("Untitled Collection")
+  previewImage    String?
+  status          String    @default("draft") // draft, saved, published
+  ipfsHash        String?
+  contractAddress String?
+  nfts            Nft[]
+}
+
+model Nft {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  image       String?  // URL or Base64
+  attributes  Json     // Array of traits { trait_type, value }
+  rarityScore Float?
+  mintStatus  String   @default("pending") // pending, minted
+  txHash      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
