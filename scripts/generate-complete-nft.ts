@@ -179,7 +179,7 @@ Extract the most appropriate values based on the prompt.`;
             theme,
             artStyle: "cartoon",
             mood: "cool",
-            faceOrientation: "frontal",
+            faceOrientation: "three-quarter",
             colorPalette: ["#00FF00", "#FF00FF", "#FFFF00"]
         };
     }
@@ -505,7 +505,7 @@ What it does:
         const theme = args[2] || "cyberpunk";
         const artStyle = args[3] || "cartoon";
         const mood = args[4] || "cool";
-        const faceOrientation = args[5] || "frontal";
+        const faceOrientation = args[5] || "three-quarter";
         const colorsInput = args[6] || "#00FF00,#FF00FF,#FFFF00";
         const traitsPerCategory = parseInt(args[7]) || 3;
         const nftsToGenerate = parseInt(args[8]) || 5;

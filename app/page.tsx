@@ -32,11 +32,22 @@ export default function Home() {
   const handleGenerate = async () => {
     if (!prompt) return;
     setIsGenerating(true);
-    setStatus("Parsing prompt...");
 
     try {
+      if (!address) throw new Error("Please connect your wallet first");
+
+      console.log("💰 processing payment...");
+      setStatus("PROCESSING PAYMENT..."); // Uppercase for consistency
+
+      const paymentResult = await mintCollection(null);
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || "Payment failed");
+      }
+
+      console.log("✅ Payment successful:", paymentResult.txHash);
+
       // Call the new NFT generation workflow
-      setStatus("Generating NFT collection...");
+      setStatus("QUEUING GENERATION..."); // Transition status
       const response = await fetch('/api/generate-nft-collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,18 +59,50 @@ export default function Home() {
         })
       });
 
-      if (!response.ok) throw new Error("Failed to generate NFT collection");
+      if (!response.ok || !response.body) throw new Error("Failed to connect to generation service");
 
-      const result = await response.json();
-      console.log("✅ NFT Collection generated:", result);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      setStatus("Redirecting to editor...");
-      router.push(`/editor?id=${result.projectId}`);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+
+        // Keep the last partial line in the buffer
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+
+            if (data.status) {
+              setStatus(data.status);
+            }
+
+            if (data.error) {
+              throw new Error(data.error);
+            }
+
+            if (data.success && data.result) {
+              console.log("✅ NFT Collection generated:", data.result);
+              setStatus("REDIRECTING...");
+              router.push(`/editor?id=${data.result.projectId}`);
+              return;
+            }
+          } catch (parseError) {
+            console.warn("Failed to parse stream line:", line);
+          }
+        }
+      }
 
     } catch (error: any) {
       console.error("Generation failed:", error);
       setStatus(`Error: ${error.message}`);
-    } finally {
       setIsGenerating(false);
     }
   };
@@ -171,7 +214,7 @@ export default function Home() {
               className="bg-primary hover:bg-primary/90 text-black font-bold px-8 py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(0,245,255,0.4)] hover:shadow-[0_0_30px_rgba(0,245,255,0.6)] flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className={`w-5 h-5 fill-current ${isGenerating ? 'animate-pulse' : ''}`} />
-              {isGenerating ? (status || 'PROCESSING...') : 'GENERATE'}
+              {isGenerating ? (status ? status.toUpperCase() : 'GENERATING...') : 'GENERATE'}
             </button>
           </div>
         </div>

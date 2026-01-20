@@ -79,6 +79,13 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error("Payment API Error:", error);
-        return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
+
+        // Handle specific EVM errors
+        const errorMessage = error.message || "";
+        if (errorMessage.includes("transfer amount exceeds balance") || errorMessage.includes("insufficient funds")) {
+            return NextResponse.json({ error: "Insufficient USDCe balance for payment" }, { status: 400 });
+        }
+
+        return NextResponse.json({ error: errorMessage || "Server Error" }, { status: 500 });
     }
 }

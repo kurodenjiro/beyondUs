@@ -358,15 +358,24 @@ export const LayerSettingsModal = ({ isOpen, onClose, layerData, onSave, availab
                                                             e.stopPropagation();
                                                             updateTraitField(index, 'isGenerating', true);
 
-                                                            try {
-                                                                console.log('🎨 Generating image for trait:', trait.name);
-                                                                console.log('📝 Using prompt:', trait.aiPrompt || trait.description || trait.name);
 
-                                                                const response = await fetch('/api/generate-image', {
+                                                            try {
+                                                                const promptToUse = trait.aiPrompt || trait.description || trait.name;
+
+                                                                // If the prompt field was empty, populate it so the user sees what was used
+                                                                if (!trait.aiPrompt) {
+                                                                    updateTraitField(index, 'aiPrompt', promptToUse);
+                                                                }
+
+                                                                console.log('🎨 Generating image for trait:', trait.name);
+                                                                console.log('📝 Using prompt:', promptToUse);
+
+                                                                const response = await fetch('/api/generate-trait', {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
                                                                     body: JSON.stringify({
-                                                                        prompt: `${trait.aiPrompt || trait.description || trait.name}, 2D game asset, minimalist flat vector, isolated on pure white background, high quality, digital art`,
+                                                                        prompt: promptToUse,
+                                                                        category: trait.name,
                                                                         style: 'none'
                                                                     })
                                                                 });
@@ -429,11 +438,18 @@ export const LayerSettingsModal = ({ isOpen, onClose, layerData, onSave, availab
                                                             updateTraitField(index, 'isGenerating', true);
 
                                                             try {
-                                                                const response = await fetch('/api/generate-image', {
+                                                                const promptToUse = trait.aiPrompt || trait.description || trait.name;
+
+                                                                if (!trait.aiPrompt) {
+                                                                    updateTraitField(index, 'aiPrompt', promptToUse);
+                                                                }
+
+                                                                const response = await fetch('/api/generate-trait', {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
                                                                     body: JSON.stringify({
-                                                                        prompt: trait.aiPrompt || trait.description || trait.name,
+                                                                        prompt: promptToUse,
+                                                                        category: trait.name,
                                                                         style: 'none'
                                                                     })
                                                                 });
@@ -503,8 +519,8 @@ export const LayerSettingsModal = ({ isOpen, onClose, layerData, onSave, availab
                             Save Changes
                         </button>
                     </div>
-                </motion.div>
-            </div>
-        </AnimatePresence>
+                </motion.div >
+            </div >
+        </AnimatePresence >
     );
 };

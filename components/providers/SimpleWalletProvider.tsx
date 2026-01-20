@@ -11,28 +11,33 @@ declare global {
 
 interface WalletContextType {
     address: string | null;
+    balance: string | null;
     isConnected: boolean;
     isConnecting: boolean;
     provider: ethers.BrowserProvider | null;
     signer: ethers.JsonRpcSigner | null;
     connect: () => Promise<void>;
     disconnect: () => void;
+    refreshBalance: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType>({
     address: null,
+    balance: null,
     isConnected: false,
     isConnecting: false,
     provider: null,
     signer: null,
     connect: async () => { },
     disconnect: () => { },
+    refreshBalance: async () => { },
 });
 
 export const useSimpleWallet = () => useContext(WalletContext);
 
 export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
     const [address, setAddress] = useState<string | null>(null);
+    const [balance, setBalance] = useState<string | null>(null);
     const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
     const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
@@ -47,6 +52,17 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
         blockExplorerUrls: ["https://explorer.cronos.org/testnet"],
     };
 
+    const fetchBalance = async (addr: string, prov: ethers.BrowserProvider) => {
+        try {
+            const rawBalance = await prov.getBalance(addr);
+            const formatted = ethers.formatEther(rawBalance);
+            setBalance(formatted);
+        } catch (e) {
+            console.error("Failed to fetch balance", e);
+            setBalance(null);
+        }
+    };
+
     const checkConnection = async () => {
         if (typeof window.ethereum !== "undefined") {
             const browserProvider = new ethers.BrowserProvider(window.ethereum);
@@ -55,8 +71,10 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
             const accounts = await browserProvider.listAccounts();
             if (accounts.length > 0) {
                 const currentSigner = await browserProvider.getSigner();
-                setAddress(accounts[0].address);
+                const currentAddress = accounts[0].address;
+                setAddress(currentAddress);
                 setSigner(currentSigner);
+                fetchBalance(currentAddress, browserProvider);
             }
         }
     };
@@ -69,10 +87,14 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
                 if (accounts.length > 0) {
                     setAddress(accounts[0]);
                     // Re-instantiate signer
-                    if (provider) provider.getSigner().then(setSigner);
+                    if (provider) {
+                        provider.getSigner().then(setSigner);
+                        fetchBalance(accounts[0], provider);
+                    }
                 } else {
                     setAddress(null);
                     setSigner(null);
+                    setBalance(null);
                 }
             });
             window.ethereum.on("chainChanged", () => window.location.reload());
@@ -97,8 +119,10 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
             // Request Account
             await browserProvider.send("eth_requestAccounts", []);
             const currentSigner = await browserProvider.getSigner();
-            setAddress(await currentSigner.getAddress());
+            const currentAddress = await currentSigner.getAddress();
+            setAddress(currentAddress);
             setSigner(currentSigner);
+            fetchBalance(currentAddress, browserProvider);
 
             // Switch Chain
             try {
@@ -120,8 +144,19 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
                 }
             }
 
-        } catch (error) {
-            console.error("Connection failed", error);
+        } catch (error: any) {
+            console.error("Connection failed detailed:", error);
+
+            // Handle Ethers v6 "could not coalesce error" (UNKNOWN_ERROR)
+            if (error.code === "UNKNOWN_ERROR" && error.error?.message === "") {
+                console.warn("Caught empty UNKNOWN_ERROR from wallet. This often means the request was rejected or failed silently.");
+                alert("Connection failed. Please unlock your wallet and try again. If the issue persists, try refreshing the page.");
+            } else if (error.code === 4001) {
+                // User rejected request
+                console.log("User rejected connection request");
+            } else {
+                alert(`Effect Connection Error: ${error.message || "Unknown error"}`);
+            }
         } finally {
             setIsConnecting(false);
         }
@@ -131,21 +166,31 @@ export const SimpleWalletProvider = ({ children }: { children: ReactNode }) => {
         // Soft disconnect for UI
         setAddress(null);
         setSigner(null);
+        setBalance(null);
+    };
+
+    const refreshBalance = async () => {
+        if (address && provider) {
+            await fetchBalance(address, provider);
+        }
     };
 
     return (
         <WalletContext.Provider
             value={{
                 address,
+                balance,
                 isConnected: !!address,
                 isConnecting,
                 provider,
                 signer,
                 connect,
                 disconnect,
+                refreshBalance
             }}
         >
             {children}
         </WalletContext.Provider>
     );
+
 };

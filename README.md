@@ -7,27 +7,28 @@
 ## 🚀 Features
 
 - **AI-Powered Analysis**: Upload a single image, and our integration with **Google Gemini Vision** deconstructs it into traits and styles.
-- **Generative Synthesis**: Create consistent variations and sprite sheets using custom diffusion pipelines.
-- **Layer Editor**: Drag-and-drop interface to fine-tune assets and layers.
-- **One-Click Minting**: Auto-deploy smart contracts and mint tokens directly to the **Cronos Network**.
+- **Generative Synthesis**: Create consistent variations using custom diffusion pipelines.
+- **Layer Editor**: Visual node-based interface to fine-tune assets and layers.
+- **One-Click Minting**: Auto-deploy smart contracts and mint tokens directly to **Cronos Testnet**.
+- **On-Chain Tracking**: Efficiently fetch and display user's NFT collection using optimized RPC scanning.
 - **x402 Compliance**: Built-in "Pay-for-Compute" using the x402 standard to ensure sustainable AI usage.
 
 ## 🛠 Tech Stack
 
 - **AI Layer**: Google Gemini 1.5 Pro Vision, Custom Diffusion Models.
-- **Blockchain**: Cronos EVM (Testnet).
+- **Blockchain**: Cronos EVM (Testnet), Hardhat.
 - **Authentication**: Privy (Embedded Wallets, Social Login).
 - **Storage**: IPFS, Prisma/Postgres.
-- **Framework**: Next.js 14, Tailwind CSS.
+- **Framework**: Next.js 14, Tailwind CSS, React Flow.
 
 ## 💰 Revenue Model
 
-BeyondUs implements a circular economic model on the Movement blockchain:
+BeyondUs implements a circular economic model:
 
-1.  **"Pay-per-Forge"**: Micro-transactions (in MOVE) for AI generation, verifying payment via `X-Payment-Hash`.
-2.  **Launchpad Fees**: 2.5% commission on primary sales of deployed collections.
-3.  **Royalties**: 5% secondary sales royalty (split 4% Creator / 1% Protocol).
-4.  **Enterprise SaaS**: Subscriptions for advanced tooling and white-glove support.
+1.  **"Pay-per-Forge"**: Micro-transactions for AI generation.
+2.  **Launchpad Fees**: Commission on primary sales of deployed collections.
+3.  **Royalties**: Secondary sales royalty (split Creator / Protocol).
+4.  **Enterprise SaaS**: Subscriptions for advanced tooling.
 
 > *By enabling users to fund AI compute costs directly from NFT sale proceeds, we establish a circular economic model on the blockchain.*
 
@@ -43,13 +44,14 @@ BeyondUs implements a circular economic model on the Movement blockchain:
 - **Embedded Wallets**: Secure, self-custodial wallets automatically generated.
 - **Seamless Signing**: No popup fatigue—keep users in the creative flow.
 
-## �️ Roadmap
+## 🗺️ Roadmap
 
 ### Phase 1: Foundation (Current)
 - [x] **AI-Native Foundry**: Complete analysis-to-generation pipeline.
-- [ ] **Cronos Testnet**: Smart contracts deployed and verified.
+- [x] **Cronos Testnet**: Smart contracts deployed and verified.
 - [x] **x402 Integration**: "Pay-for-Compute" economy live.
 - [x] **Privy Auth**: Seamless onboarding and wallet management.
+- [x] **Efficient Data Fetching**: Optimized RPC scanning for user collections.
 
 ### Phase 2: Refinement (Q2 2026)
 - [ ] **Batch Forge**: Generate entire collections (100+ items) in one click.
@@ -57,7 +59,7 @@ BeyondUs implements a circular economic model on the Movement blockchain:
 - [ ] **Social Features**: Share prompts and "remix" other users' publicly saved assets.
 
 ### Phase 3: Expansion (Q3 2026)
-- [ ] **Mainnet Launch**: Migration to Movement Mainnet.
+- [ ] **Mainnet Launch**: Migration to Cronos Mainnet.
 - [ ] **Model Fine-tuning**: Upload 15-20 images to train a custom LoRA on your own IP.
 - [ ] **Marketplace**: Native secondary trading for BeyondUs assets.
 
@@ -65,12 +67,12 @@ BeyondUs implements a circular economic model on the Movement blockchain:
 - [ ] **Developer SDK**: API access for third-party games to generate assets on the fly.
 - [ ] **Governance DAO**: Token-weighted voting on protocol fees and featured artists.
 
-## �📦 Getting Started
+## 📦 Getting Started
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/kurodenjiro/UsBeyondMove.git
-    cd UsBeyondMove
+    git clone https://github.com/kurodenjiro/beyondUs.git
+    cd beyondUs
     ```
 
 2.  Install dependencies:

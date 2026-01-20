@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract UsBeyondNFT is ERC721URIStorage, Ownable {
+contract UsBeyondNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
     uint256 private _nextTokenId;
-    string private _baseTokenURI;
 
     constructor(
         string memory name, 
@@ -22,9 +22,22 @@ contract UsBeyondNFT is ERC721URIStorage, Ownable {
         _setTokenURI(tokenId, tokenURI);
         return tokenId;
     }
-    
-    // Override to return supported interfaces
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721URIStorage) returns (bool) {
+
+    // Required overrides for ERC721Enumerable + ERC721URIStorage
+
+    function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, value);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721URIStorage, ERC721Enumerable) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
     }
 }

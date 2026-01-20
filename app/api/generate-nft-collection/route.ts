@@ -62,7 +62,7 @@ Provide a JSON response with:
         config.theme = config.theme || "modern";
         config.artStyle = config.artStyle || "cartoon";
         config.mood = config.mood || "cool";
-        config.faceOrientation = config.faceOrientation || "frontal";
+        config.faceOrientation = config.faceOrientation || "three-quarter";
 
         if (!config.colorPalette || !Array.isArray(config.colorPalette) || config.colorPalette.length === 0) {
             config.colorPalette = ["#00FF00", "#FF00FF", "#FFFF00"];
@@ -78,7 +78,7 @@ Provide a JSON response with:
             theme: words[0] || "modern",
             artStyle: "cartoon",
             mood: "cool",
-            faceOrientation: "frontal",
+            faceOrientation: "three-quarter",
             colorPalette: ["#00FF00", "#FF00FF", "#FFFF00"]
         };
     }
@@ -180,254 +180,223 @@ OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
     }
 }
 
-// Composite traits onto base
-async function compositeTraits(
-    baseImageData: string,
-    traits: Array<{ category: string; imageData: string }>
-): Promise<string> {
-    const traitList = traits.map((t, idx) => `${idx + 1}. ${t.category}`).join("\n");
-
-    const prompt = `Role: You are a professional character artist and NFT designer.
-
-Input Data:
-
-Image 1 (The Sample): This is the base character. You must preserve its pose, proportions, art style, line weight, and overall composition exactly.
-
-${traits.map((t, idx) => `Image ${idx + 2} (${t.category}): Trait to be added`).join("\n")}
-
-Objective: Composite ALL trait images onto the base character in a single, cohesive design. The resulting output should look like the character from Image 1 is naturally wearing/holding all the items.
-
-Traits to Apply:
-${traitList}
-
-Strict Constraints:
-
-1. Do Not Alter the Sample: The character's face, body shape, pose, and existing features from Image 1 must remain unchanged.
-
-2. Style Consistency: Render ALL traits using the exact same artistic style, shading, and color palette found in Image 1.
-
-3. Perspective Alignment: Adjust the angle and perspective of each trait to match the character's position.
-
-4. Proper Layering: Apply traits in the correct order:
-   - Background: Bottom layer, behind character
-   - Clothing: Base layer on character, follows torso contour
-   - Accessories: Mid layer, positioned naturally
-   - Headwear: Sits on head, behind ears but over forehead
-   - Eyewear: Top layer, aligned with eyes and face
-
-5. Technical Style: Maintain the thick black outlines and flat cel-shading present in the sample.
-
-6. Background: Keep the same solid background color from Image 1.
-
-7. Natural Integration: Each trait should look like it was always part of the original character design.
-
-Task: Generate the final composite image where ALL traits are seamlessly integrated into the base character in a single, cohesive design.
-
-Tips for Better Results:
-- Focus specifically on how each trait type should be positioned
-- Maintain the thick black outlines and flat cel-shading present in the sample
-- Render the output with the same solid background color
-
-CRITICAL: The output must look like a single, unified character design, not a collage. All traits should appear as if they were always part of the original character.`;
-
-    const parts: any[] = [
-        { text: prompt },
-        { inlineData: { mimeType: "image/png", data: baseImageData } }
-    ];
-
-    traits.forEach(t => {
-        parts.push({ inlineData: { mimeType: "image/png", data: t.imageData } });
-    });
-
-    const response = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
-        contents: {
-            role: "user",
-            parts
-        },
-        config: {
-            seed: Date.now() % 2147483647,
-            temperature: 0.1 // Increased slightly from 0.1 for better blending
-        }
-    });
-
-    const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data);
-    if (!imagePart || !imagePart.inlineData?.data) {
-        throw new Error("Failed to composite traits");
-    }
-
-    return imagePart.inlineData.data;
-}
+import { compositeTraits } from '@/lib/ai/composite';
 
 export async function POST(request: NextRequest) {
-    try {
-        const { prompt, ownerAddress, traitsPerCategory = 2, nftsToGenerate = 5 } = await request.json();
+    const encoder = new TextEncoder();
 
-        if (!prompt) {
-            return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-        }
+    const stream = new ReadableStream({
+        async start(controller) {
+            let isClosed = false;
 
-        console.log(`🚀 Starting NFT generation for: "${prompt}"`);
-
-        // Step 1: Parse prompt to config
-        console.log("📝 Parsing prompt...");
-        const config = await parsePromptToConfig(prompt);
-        console.log("✅ Config:", config);
-
-        // Step 2: Generate base NFT sample
-        console.log("🎨 Generating base NFT sample...");
-        const baseImageData = await generateNFTSample(config);
-        console.log("✅ Base NFT generated");
-
-        // Step 3: Generate traits
-        console.log(`🎨 Generating ${traitsPerCategory} traits per category...`);
-        const categories = ["background", "headwear", "eyewear", "accessory", "clothing"];
-        const generatedTraits: GeneratedTrait[] = [];
-
-        for (const category of categories) {
-            for (let i = 1; i <= traitsPerCategory; i++) {
-                const trait = await generateTrait(category, config, i);
-                if (trait) {
-                    generatedTraits.push(trait);
-                    console.log(`  ✅ ${category} ${i}/${traitsPerCategory}`);
+            const safeClose = () => {
+                if (!isClosed) {
+                    isClosed = true;
+                    try { controller.close(); } catch (e) { console.warn("Stream close error:", e); }
                 }
-            }
-        }
+            };
 
-        console.log(`✅ Generated ${generatedTraits.length} traits`);
+            const send = (data: any) => {
+                if (isClosed) return;
+                try {
+                    controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+                } catch (e) {
+                    console.warn("Failed to send to stream:", e);
+                    safeClose();
+                }
+            };
 
-        // Step 4: Create NFT variations
-        console.log(`🎨 Creating ${nftsToGenerate} NFT variations...`);
-        const nfts: Array<{
-            name: string;
-            image: string;
-            attributes: Array<{ trait_type: string; value: string }>;
-        }> = [];
+            try {
+                const { prompt, ownerAddress, traitsPerCategory = 2, nftsToGenerate = 5 } = await request.json();
 
-        for (let i = 1; i <= nftsToGenerate; i++) {
-            // Randomly select traits
-            const selectedTraits = categories.map(cat => {
-                const categoryTraits = generatedTraits.filter(t => t.category === cat);
-                return categoryTraits[Math.floor(Math.random() * categoryTraits.length)];
-            }).filter(Boolean);
+                if (!prompt) {
+                    send({ error: 'Prompt is required' });
+                    return; // finally will close
+                }
 
-            const traitsToComposite = selectedTraits.map(t => ({
-                category: t.category,
-                imageData: t.imageData
-            }));
+                console.log(`🚀 Starting NFT generation for: "${prompt}"`);
+                send({ status: "Parsing prompt..." });
 
-            const compositedImage = await compositeTraits(baseImageData, traitsToComposite);
+                // Step 1: Parse prompt to config
+                const config = await parsePromptToConfig(prompt);
+                console.log("✅ Config:", config);
 
-            nfts.push({
-                name: `${config.subject} #${i}`,
-                image: `data:image/png;base64,${compositedImage}`,
-                attributes: selectedTraits.map(t => ({
-                    trait_type: t.category,
-                    value: t.description
-                }))
-            });
+                // Step 2: Generate base NFT sample
+                send({ status: "Generating base NFT sample..." });
+                const baseImageData = await generateNFTSample(config);
+                console.log("✅ Base NFT generated");
+                send({ status: "Base NFT generated" });
 
-            console.log(`  ✅ NFT ${i}/${nftsToGenerate}`);
-        }
+                // Step 3: Generate traits
+                send({ status: `Generating ${traitsPerCategory} traits per category...` });
+                const categories = ["background", "headwear", "eyewear", "accessory", "clothing"];
+                const generatedTraits: GeneratedTrait[] = [];
 
-        console.log("✅ All NFTs generated");
+                for (const category of categories) {
+                    for (let i = 1; i <= traitsPerCategory; i++) {
+                        // Check if we can still send
+                        if (isClosed) break;
 
-        // Step 5: Save to database
-        console.log("💾 Saving to database...");
+                        send({ status: `Generating ${category} ${i}/${traitsPerCategory}...` });
+                        const trait = await generateTrait(category, config, i);
+                        if (trait) {
+                            generatedTraits.push(trait);
+                            console.log(`  ✅ ${category} ${i}/${traitsPerCategory}`);
+                        }
+                    }
+                    if (isClosed) break;
+                }
 
-        // Create layers structure for editor
-        const layerMap = new Map<string, any>();
+                if (isClosed) return;
 
-        // 1. Add Background Layer
-        const bgTraits = generatedTraits.filter(t => t.category === "background");
-        layerMap.set("Background", {
-            name: "Background",
-            parentLayer: "",
-            position: { x: 0, y: 0, width: 1024, height: 1024 },
-            aiPrompt: `Background for ${config.subject}`,
-            traits: bgTraits.length > 0 ? bgTraits.map(t => ({
-                name: t.description,
-                rarity: 100 / bgTraits.length,
-                imageUrl: `data:image/png;base64,${t.imageData}`,
-                description: t.description,
-                anchorPoints: { top: false, bottom: false, left: false, right: false }
-            })) : []
-        });
+                console.log(`✅ Generated ${generatedTraits.length} traits`);
+                send({ status: "Generating collection variants..." });
 
-        // 2. Add Base/Body Layer (The sample)
-        layerMap.set("Body", {
-            name: "Body",
-            parentLayer: "Background",
-            position: { x: 0, y: 0, width: 1024, height: 1024 },
-            aiPrompt: `Base character ${config.subject}`,
-            traits: [{
-                name: "Base Character",
-                rarity: 100,
-                imageUrl: `data:image/png;base64,${baseImageData}`,
-                description: "Original generated base",
-                anchorPoints: { top: false, bottom: false, left: false, right: false }
-            }]
-        });
+                // Step 4: Create NFT variations
+                const nfts: Array<{
+                    name: string;
+                    image: string;
+                    attributes: Array<{ trait_type: string; value: string }>;
+                }> = [];
 
-        // 3. Add other accessory layers attached to Body
-        const accessoryCategories = ["clothing", "accessory", "headwear", "eyewear"];
+                for (let i = 1; i <= nftsToGenerate; i++) {
+                    if (isClosed) break;
 
-        accessoryCategories.forEach(category => {
-            const categoryTraits = generatedTraits.filter(t => t.category === category);
-            if (categoryTraits.length > 0) {
-                const displayName = category.charAt(0).toUpperCase() + category.slice(1);
+                    send({ status: `Creating NFT variant ${i}/${nftsToGenerate}...` });
+                    // Randomly select traits
+                    const selectedTraits = categories.map(cat => {
+                        const categoryTraits = generatedTraits.filter(t => t.category === cat);
+                        return categoryTraits[Math.floor(Math.random() * categoryTraits.length)];
+                    }).filter(Boolean);
 
-                layerMap.set(displayName, {
-                    name: displayName,
-                    parentLayer: "Body",
+                    const traitsToComposite = selectedTraits.map(t => ({
+                        category: t.category,
+                        imageData: t.imageData
+                    }));
+
+                    const compositedImage = await compositeTraits(baseImageData, traitsToComposite);
+
+                    nfts.push({
+                        name: `${config.subject} #${i}`,
+                        image: `data:image/png;base64,${compositedImage}`,
+                        attributes: selectedTraits.map(t => ({
+                            trait_type: t.category,
+                            value: t.description
+                        }))
+                    });
+
+                    console.log(`  ✅ NFT ${i}/${nftsToGenerate}`);
+                }
+
+                if (isClosed) return;
+
+                console.log("✅ All NFTs generated");
+                send({ status: "Saving to database..." });
+
+                // Step 5: Save to database
+                // Create layers structure for editor
+                const layerMap = new Map<string, any>();
+
+                // 1. Add Background Layer
+                const bgTraits = generatedTraits.filter(t => t.category === "background");
+                layerMap.set("Background", {
+                    name: "Background",
+                    parentLayer: "",
                     position: { x: 0, y: 0, width: 1024, height: 1024 },
-                    aiPrompt: `${category} for ${config.subject}`,
-                    traits: categoryTraits.map((t, idx) => ({
+                    aiPrompt: `Background for ${config.subject}`,
+                    traits: bgTraits.length > 0 ? bgTraits.map(t => ({
                         name: t.description,
-                        rarity: 100 / categoryTraits.length,
+                        rarity: 100 / bgTraits.length,
                         imageUrl: `data:image/png;base64,${t.imageData}`,
                         description: t.description,
                         anchorPoints: { top: false, bottom: false, left: false, right: false }
-                    }))
+                    })) : []
                 });
+
+                // 2. Add Base/Body Layer (The sample)
+                layerMap.set("Body", {
+                    name: "Body",
+                    parentLayer: "Background",
+                    position: { x: 0, y: 0, width: 1024, height: 1024 },
+                    aiPrompt: `Base character ${config.subject}`,
+                    traits: [{
+                        name: "Base Character",
+                        rarity: 100,
+                        imageUrl: `data:image/png;base64,${baseImageData}`,
+                        description: "Original generated base",
+                        anchorPoints: { top: false, bottom: false, left: false, right: false }
+                    }]
+                });
+
+                // 3. Add other accessory layers attached to Body
+                const accessoryCategories = ["clothing", "accessory", "headwear", "eyewear"];
+
+                accessoryCategories.forEach(category => {
+                    const categoryTraits = generatedTraits.filter(t => t.category === category);
+                    if (categoryTraits.length > 0) {
+                        const displayName = category.charAt(0).toUpperCase() + category.slice(1);
+
+                        layerMap.set(displayName, {
+                            name: displayName,
+                            parentLayer: "Body",
+                            position: { x: 0, y: 0, width: 1024, height: 1024 },
+                            aiPrompt: `${category} for ${config.subject}`,
+                            traits: categoryTraits.map((t, idx) => ({
+                                name: t.description,
+                                rarity: 100 / categoryTraits.length,
+                                imageUrl: `data:image/png;base64,${t.imageData}`,
+                                description: t.description,
+                                anchorPoints: { top: false, bottom: false, left: false, right: false }
+                            }))
+                        });
+                    }
+                });
+
+                const layers = Array.from(layerMap.values());
+
+                const project = await prisma.project.create({
+                    data: {
+                        ownerAddress: ownerAddress || "anonymous",
+                        prompt,
+                        name: `${config.subject} ${config.theme} Collection`,
+                        layers,
+                        previewImage: `data:image/png;base64,${baseImageData}`,
+                        status: "saved",
+                        nfts: {
+                            create: nfts.map(nft => ({
+                                name: nft.name,
+                                image: nft.image,
+                                attributes: nft.attributes,
+                                description: `${config.subject} with ${nft.attributes.length} traits`
+                            }))
+                        }
+                    }
+                });
+
+                console.log(`✅ Saved project: ${project.id}`);
+                send({
+                    success: true,
+                    result: {
+                        projectId: project.id,
+                        nftsCreated: nfts.length,
+                        config
+                    }
+                });
+
+            } catch (error: any) {
+                console.error('NFT generation error:', error);
+                send({ error: error.message || 'Failed to generate NFTs' });
+            } finally {
+                safeClose();
             }
-        });
+        }
+    });
 
-        const layers = Array.from(layerMap.values());
-
-        const project = await prisma.project.create({
-            data: {
-                ownerAddress: ownerAddress || "anonymous",
-                prompt,
-                name: `${config.subject} ${config.theme} Collection`,
-                layers,
-                previewImage: `data:image/png;base64,${baseImageData}`,
-                status: "saved",
-                nfts: {
-                    create: nfts.map(nft => ({
-                        name: nft.name,
-                        image: nft.image,
-                        attributes: nft.attributes,
-                        description: `${config.subject} with ${nft.attributes.length} traits`
-                    }))
-                }
-            }
-        });
-
-        console.log(`✅ Saved project: ${project.id}`);
-
-        return NextResponse.json({
-            success: true,
-            projectId: project.id,
-            nftsCreated: nfts.length,
-            config
-        });
-
-    } catch (error: any) {
-        console.error('NFT generation error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to generate NFTs' },
-            { status: 500 }
-        );
-    }
+    return new NextResponse(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    });
 }

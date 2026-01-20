@@ -354,7 +354,7 @@ export default function MintPage() {
                             <div className="flex gap-8 border-y border-white/10 py-6 my-8">
                                 <div>
                                     <p className="text-sm text-muted-foreground uppercase tracking-widest mb-1">Price</p>
-                                    <p className="text-2xl font-bold font-mono">0.0 MOVE</p>
+                                    <p className="text-2xl font-bold font-mono">0.0 TCRO</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground uppercase tracking-widest mb-1">Supply</p>
@@ -369,28 +369,51 @@ export default function MintPage() {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleMint}
-                                disabled={minting || nfts.length === 0}
-                                className="w-full py-6 bg-primary text-black text-xl font-bold rounded-2xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(0,245,255,0.3)] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none bg-primary"
-                            >
-                                {minting ? (
-                                    <Sparkles className="w-6 h-6 animate-spin" />
+                            <div className="space-y-4">
+                                {!project.contractAddress ? (
+                                    <div className="p-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-200">
+                                        <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
+                                            <Box className="w-5 h-5" />
+                                            Collection Not Deployed
+                                        </h3>
+                                        <p className="text-sm text-yellow-200/80 mb-4">
+                                            This collection has not been published to the blockchain yet.
+                                            You cannot mint NFTs until the creator deploys the smart contract.
+                                        </p>
+                                        {address && project.ownerAddress && address.toLowerCase() === project.ownerAddress.toLowerCase() && (
+                                            <a
+                                                href={`/editor?id=${id}`}
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors"
+                                            >
+                                                Go to Editor & Deploy
+                                            </a>
+                                        )}
+                                    </div>
                                 ) : (
-                                    <Box className="w-6 h-6" />
+                                    <button
+                                        onClick={handleMint}
+                                        disabled={minting || nfts.length === 0}
+                                        className="w-full py-6 bg-primary text-black text-xl font-bold rounded-2xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(0,245,255,0.3)] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none bg-primary"
+                                    >
+                                        {minting ? (
+                                            <Sparkles className="w-6 h-6 animate-spin" />
+                                        ) : (
+                                            <Box className="w-6 h-6" />
+                                        )}
+                                        {minting ? "Minting..." : (
+                                            nfts.length === 0 ? "SOLD OUT" : (isConnected ? "Mint on Testnet" : "Connect Wallet to Mint")
+                                        )}
+                                    </button>
                                 )}
-                                {minting ? "Minting..." : (
-                                    nfts.length === 0 ? "SOLD OUT" : (isConnected ? "Mint on Testnet" : "Connect Wallet to Mint")
-                                )}
-                            </button>
 
-                            <p className="text-center text-sm text-muted-foreground mt-6">
-                                Powered by UsBeyondMove & Cronos Testnet
-                            </p>
+                                <p className="text-center text-sm text-muted-foreground mt-2">
+                                    Powered by UsBeyond & Cronos Testnet
+                                </p>
+                            </div>
                         </div>
                     )}
                 </motion.div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

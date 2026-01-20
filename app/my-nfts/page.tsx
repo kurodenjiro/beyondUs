@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useSimpleWallet } from "@/components/providers/SimpleWalletProvider";
+import { useUsBeyond } from "@/hooks/useUsBeyond"; // Import hook
 import Link from "next/link";
 import { Sparkles, ArrowRight, LayoutGrid, Layers, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function MyNFTsPage() {
     const { address, isConnected, connect } = useSimpleWallet();
+    const { fetchMyNFTsFromChain, isLoading: hookLoading } = useUsBeyond(); // Use hook
     const [nfts, setNfts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -22,11 +24,9 @@ export default function MyNFTsPage() {
     const fetchMyNFTs = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`/api/nfts?ownerAddress=${address}`);
-            if (res.ok) {
-                const data = await res.json();
-                setNfts(data);
-            }
+            // RPC Fetch (Optimized)
+            const data = await fetchMyNFTsFromChain();
+            setNfts(data || []);
         } catch (error) {
             console.error("Failed to fetch NFTs:", error);
         } finally {
@@ -61,9 +61,9 @@ export default function MyNFTsPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">My NFTs</h1>
+                    <h1 className="text-3xl font-bold tracking-tight mb-2">My NFTs (On-Chain)</h1>
                     <p className="text-muted-foreground">
-                        View and manage your minted NFTs.
+                        View and manage your minted NFTs directly from Cronos Testnet.
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -84,7 +84,7 @@ export default function MyNFTsPage() {
                 </div>
             </div>
 
-            {loading ? (
+            {loading || hookLoading ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {[1, 2, 3, 4, 5].map((i) => (
                         <div key={i} className="aspect-[3/4] rounded-xl bg-white/5 animate-pulse" />
@@ -95,7 +95,7 @@ export default function MyNFTsPage() {
                     <LayoutGrid className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-xl font-semibold mb-2">No NFTs found</h3>
                     <p className="text-muted-foreground mb-6">
-                        You haven't minted any NFTs yet.
+                        You haven't minted any NFTs yet on this network.
                     </p>
                     <Link
                         href="/"
@@ -108,7 +108,7 @@ export default function MyNFTsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {nfts.map((nft, index) => (
                         <motion.div
-                            key={nft.id}
+                            key={`${nft.collectionAddress}-${nft.id}`}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: index * 0.05 }}
@@ -128,14 +128,14 @@ export default function MyNFTsPage() {
                                 )}
                                 <div className="absolute top-2 right-2">
                                     <span className="text-[10px] uppercase font-bold bg-black/60 backdrop-blur px-2 py-1 rounded border border-white/10 text-white/80">
-                                        #{nft.id.slice(-4)}
+                                        #{nft.id}
                                     </span>
                                 </div>
                             </div>
                             <div className="p-4">
                                 <h3 className="font-bold text-sm truncate">{nft.name}</h3>
                                 <p className="text-xs text-muted-foreground mt-1 truncate">
-                                    {nft.Project?.name || "Unknown Collection"}
+                                    {nft.collectionName || "Unknown Collection"}
                                 </p>
 
                                 <div className="mt-3 flex justify-between items-center">

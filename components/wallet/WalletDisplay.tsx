@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const WalletDisplay = () => {
-    const { address, isConnected, disconnect } = useSimpleWallet();
+    const { address, balance, isConnected, disconnect } = useSimpleWallet();
     const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = () => {
@@ -34,6 +34,11 @@ export const WalletDisplay = () => {
             <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-white/20 cursor-pointer transition-all select-none">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    {balance && (
+                        <span className="text-sm font-medium text-white/90 mr-2 border-r border-white/10 pr-2">
+                            {parseFloat(balance).toFixed(2)} <span className="text-white/50 text-xs">TCRO</span>
+                        </span>
+                    )}
                     <span className="text-sm font-mono text-white/90">
                         {shortAddress}
                     </span>

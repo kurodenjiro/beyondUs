@@ -11,8 +11,10 @@ import UsBeyondNFTABI from "@/lib/abis/UsBeyondNFT.json";
 
 
 export const useUsBeyond = () => {
-    const { signer, address, isConnected, connect } = useSimpleWallet();
+    const { signer, address, isConnected, connect, provider } = useSimpleWallet();
     const [isLoading, setIsLoading] = useState(false);
+
+    // ... (rest of the file)
 
     // 1. Create Collection via Factory
     const createCollection = async (name: string, symbol: string) => {
@@ -90,9 +92,156 @@ export const useUsBeyond = () => {
         }
     };
 
+    // 3. Fetch My NFTs via Hybrid: Enumerable + Scanning Fallback
+    const fetchMyNFTsFromChain = async () => {
+        if (!address || !provider) return [];
+
+        setIsLoading(true);
+        const myNFTs: any[] = [];
+
+        try {
+            // A. Get All Collections from Factory
+            const factoryContract = new ethers.Contract(FACTORY_ADDRESS, UsBeyondFactoryABI.abi, provider);
+            const allCollections = await factoryContract.getAllCollections();
+
+            console.log(`Found ${allCollections.length} collections. Checking balances...`);
+
+            const currentBlock = await provider.getBlockNumber();
+
+            // Helper: Fetch Logs with Chunking (for fallback)
+            const getLogsChunked = async (contract: any, filter: any, fromBlock: number, toBlock: number) => {
+                const logs = [];
+                const CHUNK_SIZE = 2000;
+                for (let i = fromBlock; i <= toBlock; i += CHUNK_SIZE) {
+                    const end = Math.min(i + CHUNK_SIZE - 1, toBlock);
+                    try {
+                        const chunkLogs = await contract.queryFilter(filter, i, end);
+                        logs.push(...chunkLogs);
+                    } catch (e) {
+                        console.warn(`Failed to fetch logs for range ${i}-${end}`, e);
+                    }
+                }
+                return logs;
+            };
+
+            // B. Iterate Collections
+            for (const collection of allCollections) {
+                const nftContract = new ethers.Contract(collection.collectionAddress, UsBeyondNFTABI.abi, provider);
+
+                // Strategy 1: Check Standard ERC721 Balance First
+                // This filters out collections where user has 0 items instantly
+                let balance = 0n;
+                try {
+                    balance = await nftContract.balanceOf(address);
+                } catch (e) {
+                    console.warn(`Failed to check balance for ${collection.name}`, e);
+                    continue;
+                }
+
+                if (balance === 0n) continue; // User owns nothing here, skip.
+
+                console.log(`User owns ${balance} items in ${collection.name}. Fetching IDs...`);
+
+                // Strategy 2: Attempt ERC721Enumerable
+                let successViaEnumerable = false;
+                try {
+                    const promises = [];
+                    for (let i = 0; i < Number(balance); i++) {
+                        promises.push(nftContract.tokenOfOwnerByIndex(address, i));
+                    }
+                    const tokenIds = await Promise.all(promises);
+
+                    // Fetch Metadata for IDs
+                    for (const tokenId of tokenIds) {
+                        try {
+                            const tokenUri = await nftContract.tokenURI(tokenId);
+                            let metadata = { name: `NFT #${tokenId}`, image: null };
+                            try {
+                                const httpUri = tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                                const metaRes = await fetch(httpUri);
+                                if (metaRes.ok) metadata = await metaRes.json();
+                            } catch (e) { /* ignore */ }
+
+                            myNFTs.push({
+                                id: tokenId.toString(),
+                                collectionName: collection.name,
+                                collectionAddress: collection.collectionAddress,
+                                name: metadata.name || `${collection.symbol} #${tokenId}`,
+                                image: metadata.image,
+                                mintStatus: 'minted',
+                            });
+                        } catch (e) { console.warn("Failed to load token metadata", e) }
+                    }
+                    successViaEnumerable = true;
+                    console.log(`Fetched ${balance} NFTs via Enumerable for ${collection.name}`);
+
+                } catch (e) {
+                    // tokenOfOwnerByIndex failed (likely not implemented on old contract)
+                    console.log(`Enumerable failed (legacy contract?), falling back to scanning for ${collection.name}`);
+                }
+
+                if (successViaEnumerable) continue;
+
+                // Strategy 3: Fallback to Event Scanning (Legacy)
+                // Filter: Transfer(from, to, tokenId) -> 'to' = address
+                const filter = nftContract.filters.Transfer(null, address);
+
+                let startBlock = 0;
+                if (collection.createdAt) {
+                    const ageSeconds = Math.floor(Date.now() / 1000) - Number(collection.createdAt);
+                    const blocksAgo = Math.floor(ageSeconds / 5.5);
+                    startBlock = Math.max(0, currentBlock - blocksAgo - 1000);
+                }
+
+                console.log(`Scanning collection ${collection.name} from block ${startBlock} (Fallback)`);
+
+                const events = await getLogsChunked(nftContract, filter, startBlock, currentBlock);
+                const candidateTokenIds = new Set<bigint>();
+                events.forEach((event: any) => {
+                    if (event.args && event.args[2]) candidateTokenIds.add(event.args[2]);
+                });
+
+                if (candidateTokenIds.size > 0) {
+                    for (const tokenId of candidateTokenIds) {
+                        try {
+                            // Verify ownership is still current
+                            const owner = await nftContract.ownerOf(tokenId);
+                            if (owner.toLowerCase() === address.toLowerCase()) {
+                                const tokenUri = await nftContract.tokenURI(tokenId);
+                                let metadata = { name: `NFT #${tokenId}`, image: null };
+                                try {
+                                    const httpUri = tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                                    const metaRes = await fetch(httpUri);
+                                    if (metaRes.ok) metadata = await metaRes.json();
+                                } catch (e) { /* ignore */ }
+
+                                myNFTs.push({
+                                    id: tokenId.toString(),
+                                    collectionName: collection.name,
+                                    collectionAddress: collection.collectionAddress,
+                                    name: metadata.name || `${collection.symbol} #${tokenId}`,
+                                    image: metadata.image,
+                                    mintStatus: 'minted',
+                                });
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error("Failed to fetch NFTs from chain:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+        return myNFTs;
+    };
+
     return {
         createCollection,
         mintNFT,
+        fetchMyNFTsFromChain, // Export the correct function
         isLoading,
         userAddress: address,
         isConnected
