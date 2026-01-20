@@ -225,7 +225,7 @@ export const ManageLayers = () => {
                 // Check if all selected traits are in this NFT AND
                 // all NFT traits are in selected traits (exact match both ways)
                 const allSelectedInNFT = selectedTraitNames.every(name => nftTraitValues.includes(name));
-                const allNFTInSelected = nftTraitValues.every(value => selectedTraitNames.includes(value));
+                const allNFTInSelected = nftTraitValues.every((value: any) => selectedTraitNames.includes(value));
 
                 return allSelectedInNFT && allNFTInSelected;
             });
@@ -638,9 +638,7 @@ export const ManageLayers = () => {
 
             if (!data.success) throw new Error("Failed to generate NFT");
 
-            if (!data.success) throw new Error("Failed to generate NFT");
-
-            let savedNFT;
+            let savedNFT: any;
 
             if (existingNFT) {
                 console.log("♻️ Step 2: Regenerating - Updating existing NFT...");

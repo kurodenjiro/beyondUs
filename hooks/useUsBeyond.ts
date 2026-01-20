@@ -130,7 +130,7 @@ export const useUsBeyond = () => {
 
                 // Strategy 1: Check Standard ERC721 Balance First
                 // This filters out collections where user has 0 items instantly
-                let balance = 0n;
+                let balance = BigInt(0);
                 try {
                     balance = await nftContract.balanceOf(address);
                 } catch (e) {
@@ -138,7 +138,7 @@ export const useUsBeyond = () => {
                     continue;
                 }
 
-                if (balance === 0n) continue; // User owns nothing here, skip.
+                if (balance === BigInt(0)) continue; // User owns nothing here, skip.
 
                 console.log(`User owns ${balance} items in ${collection.name}. Fetching IDs...`);
 
