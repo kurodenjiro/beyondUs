@@ -61,7 +61,7 @@ export default function MyNFTsPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">My NFTs (On-Chain)</h1>
+                    <h1 className="text-3xl font-bold tracking-tight mb-2">My NFTs</h1>
                     <p className="text-muted-foreground">
                         View and manage your minted NFTs directly from Cronos Testnet.
                     </p>

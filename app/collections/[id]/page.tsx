@@ -81,8 +81,8 @@ export default function CollectionDetailPage() {
                         <div>
                             <h1 className="text-3xl font-bold">{project.name}</h1>
                             <p className="text-muted-foreground flex items-center gap-2">
-                                <span className={project.status === 'published' ? "text-white" : "text-yellow-400 uppercase text-xs font-bold tracking-wider"}>
-                                    {project.status || 'DRAFT'}
+                                <span className={project.status === 'published' && project.contractAddress ? "text-green-400 font-bold tracking-wider text-xs border border-green-500/30 px-2 py-0.5 rounded bg-green-500/10" : "text-yellow-400 uppercase text-xs font-bold tracking-wider border border-yellow-500/30 px-2 py-0.5 rounded bg-yellow-500/10"}>
+                                    {project.status === 'published' && project.contractAddress ? 'PUBLISHED' : 'DRAFT'}
                                 </span>
                                 • {nfts.length} Items
                             </p>

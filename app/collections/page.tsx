@@ -47,12 +47,16 @@ export default function CollectionsPage() {
             console.log("Publishing Collection to Cronos:", collection.name);
 
             // 1. Create Collection On-Chain
-            const txHash = await createCollection(
+            const deployment = await createCollection(
                 collection.name || "Untitled Collection",
                 "USBYD" // Symbol
             );
 
-            console.log("✅ Collection created:", txHash);
+            if (!deployment || !deployment.hash || !deployment.address) {
+                throw new Error("Deployment failed - no address returned");
+            }
+
+            console.log("✅ Collection created:", deployment.address);
 
             // 2. Update Project Status in Database
             const updateRes = await fetch(`/api/projects/${collection.id}`, {
@@ -60,9 +64,7 @@ export default function CollectionsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: 'published',
-                    // TODO: Store contract address if we can retrieve it from event logs or if we rely on factory registry
-                    // For now, we assume success marks it published. 
-                    // Ideally, we'd wait for receipt and get the address.
+                    contractAddress: deployment.address
                 })
             });
 
@@ -70,10 +72,10 @@ export default function CollectionsPage() {
 
             // Update Local State
             setCollections(prev => prev.map(c =>
-                c.id === collection.id ? { ...c, status: 'published' } : c
+                c.id === collection.id ? { ...c, status: 'published', contractAddress: deployment.address } : c
             ));
 
-            alert(`Collection published to Cronos! Tx: ${txHash}`);
+            alert(`Collection published to Cronos! Tx: ${deployment.hash}`);
 
         } catch (error: any) {
             console.error("Publishing failed:", error);
@@ -154,7 +156,7 @@ export default function CollectionsPage() {
                                 <div className="relative aspect-square rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3 group-hover:border-primary/50 transition-colors">
                                     {/* Status Badge */}
                                     <div className="absolute top-3 right-3 z-10">
-                                        {collection.status === 'published' ? (
+                                        {collection.status === 'published' && collection.contractAddress ? (
                                             <div className="px-2 py-1 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center gap-1.5 text-xs font-bold text-white">
                                                 <CheckCircle className="w-3 h-3" />
                                                 PUBLISHED
@@ -184,7 +186,7 @@ export default function CollectionsPage() {
                                             View Details <ArrowRight className="w-4 h-4" />
                                         </span>
 
-                                        {/* Publish Action - Always Visible */}
+                                        {/* Publish Action - Always Visible if not fully published */}
                                         <button
                                             onClick={(e) => handlePublish(e, collection)}
                                             className="w-full py-2 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-colors flex items-center justify-center gap-2 text-sm"
@@ -195,11 +197,11 @@ export default function CollectionsPage() {
                                             ) : (
                                                 <Upload className="w-4 h-4" />
                                             )}
-                                            {publishingId === collection.id ? 'Processing...' : (collection.status === 'published' ? 'Mint More NFTs' : 'Publish Collection')}
+                                            {publishingId === collection.id ? 'Processing...' : (collection.status === 'published' && collection.contractAddress ? 'Mint More NFTs' : 'Publish Collection')}
                                         </button>
 
-                                        {/* Mint Page Link - Visible if Published */}
-                                        {collection.status === 'published' && (
+                                        {/* Mint Page Link - Visible if Published AND Deployed */}
+                                        {collection.status === 'published' && collection.contractAddress && (
                                             <Link
                                                 href={`/mint/${collection.id}`}
                                                 onClick={(e) => e.stopPropagation()}
