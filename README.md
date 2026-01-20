@@ -1,4 +1,4 @@
-# BeyondUs: The AI-Native NFT Foundry on Movement
+# BeyondUs: The AI-Native NFT Foundry on Cronos
 
 ![BeyondUs](/logo.png)
 
@@ -17,7 +17,7 @@
 
 - **AI Layer**: Google Gemini 1.5 Pro Vision, Custom Diffusion Models.
 - **Blockchain**: Cronos EVM (Testnet), Hardhat.
-- **Authentication**: Privy (Embedded Wallets, Social Login).
+- **Authentication**: SimpleWallet (Metamask, Browser/Injected).
 - **Storage**: IPFS, Prisma/Postgres.
 - **Framework**: Next.js 14, Tailwind CSS, React Flow.
 
@@ -38,19 +38,13 @@ BeyondUs implements a circular economic model:
 - **Sybil Resistance**: Cost-based protection against spam and bots.
 - **Agentic Standards**: Ready for autonomous AI agents to negotiate resources.
 
-## 🔐 Why Privy?
-
-- **Invisible Web3**: Email/Social login for mass adoption.
-- **Embedded Wallets**: Secure, self-custodial wallets automatically generated.
-- **Seamless Signing**: No popup fatigue—keep users in the creative flow.
-
 ## 🗺️ Roadmap
 
 ### Phase 1: Foundation (Current)
 - [x] **AI-Native Foundry**: Complete analysis-to-generation pipeline.
 - [x] **Cronos Testnet**: Smart contracts deployed and verified.
 - [x] **x402 Integration**: "Pay-for-Compute" economy live.
-- [x] **Privy Auth**: Seamless onboarding and wallet management.
+- [x] **SimpleWallet Integration**: Seamless generic wallet connection.
 - [x] **Efficient Data Fetching**: Optimized RPC scanning for user collections.
 
 ### Phase 2: Refinement (Q2 2026)
@@ -89,7 +83,7 @@ BeyondUs implements a circular economic model:
 4.  Set up environment variables:
     ```bash
     cp .env.example .env
-    # Fill in your GEMINI_API_KEY, PRIVY_APP_ID, etc.
+    # Fill in your GEMINI_API_KEY, etc.
     ```
 
 5.  Run the development server:
