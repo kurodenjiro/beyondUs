@@ -37,7 +37,7 @@ export default function Home() {
       if (!address) throw new Error("Please connect your wallet first");
 
       console.log("💰 processing payment...");
-      setStatus("PROCESSING PAYMENT..."); // Uppercase for consistency
+      setStatus("PROCESSING PAYMENT...");
 
       const paymentResult = await mintCollection(null);
       if (!paymentResult.success) {
@@ -45,59 +45,91 @@ export default function Home() {
       }
 
       console.log("✅ Payment successful:", paymentResult.txHash);
+      setStatus("INITIALIZING PROJECT...");
 
-      // Call the new NFT generation workflow
-      setStatus("QUEUING GENERATION..."); // Transition status
-      const response = await fetch('/api/generate-nft-collection', {
+      // 1. Init Project
+      const initRes = await fetch('/api/projects/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, ownerAddress: address })
+      });
+      const initData = await initRes.json();
+      if (!initData.projectId) throw new Error(initData.error || "Failed to init project");
+
+      const { projectId, config } = initData;
+      console.log("✅ Project initialized:", projectId);
+
+      // 2. Generate Base
+      setStatus("GENERATING BASE CHARACTER...");
+      const baseRes = await fetch(`/api/projects/${projectId}/generate-base`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config })
+      });
+      const baseData = await baseRes.json();
+      if (!baseData.success) throw new Error(baseData.error || "Failed to generate base");
+
+      const { baseImageData } = baseData;
+      console.log("✅ Base generated");
+
+      // 3. Generate Traits
+      const categories = ["background", "headwear", "eyewear", "accessory", "clothing"];
+      const traitsPerCategory = 2; // Fixed for now, can be dynamic
+      const generatedTraits: any[] = [];
+      let failureCount = 0;
+
+      for (const category of categories) {
+        setStatus(`GENERATING ${category.toUpperCase()}...`);
+
+        const promises = [];
+        for (let i = 1; i <= traitsPerCategory; i++) {
+          promises.push(
+            (async () => {
+              try {
+                const res = await fetch(`/api/projects/${projectId}/generate-trait`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ category, variationNumber: i, config })
+                });
+                const data = await res.json();
+                if (data.success && data.trait) {
+                  return data.trait;
+                }
+                return null;
+              } catch (e) {
+                console.warn(`Failed trait ${category} ${i}`, e);
+                return null;
+              }
+            })()
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(t => {
+          if (t) generatedTraits.push(t);
+          else failureCount++;
+        });
+      }
+
+      // 4. Finalize
+      setStatus("FINALIZING RELEASE...");
+      const finalizeRes = await fetch(`/api/projects/${projectId}/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt,
-          ownerAddress: address,
-          traitsPerCategory: 2,
+          baseImageData,
+          traits: generatedTraits,
+          config,
           nftsToGenerate: supply
         })
       });
+      const finalizeData = await finalizeRes.json();
 
-      if (!response.ok || !response.body) throw new Error("Failed to connect to generation service");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-
-        // Keep the last partial line in the buffer
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const data = JSON.parse(line);
-
-            if (data.status) {
-              setStatus(data.status);
-            }
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            if (data.success && data.result) {
-              console.log("✅ NFT Collection generated:", data.result);
-              setStatus("REDIRECTING...");
-              router.push(`/editor?id=${data.result.projectId}`);
-              return;
-            }
-          } catch (parseError) {
-            console.warn("Failed to parse stream line:", line);
-          }
-        }
+      if (finalizeData.success) {
+        setStatus("REDIRECTING...");
+        router.push(`/editor?id=${projectId}`);
+      } else {
+        throw new Error(finalizeData.error || "Failed to finalize project");
       }
 
     } catch (error: any) {
