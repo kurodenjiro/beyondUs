@@ -5,10 +5,10 @@ import { generateNFTSample } from '@/lib/ai/generators';
 // Use params context correctly for Next.js 13+ app directory dynamic routes
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const { config } = await request.json();
 
         if (!config) {
