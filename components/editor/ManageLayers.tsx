@@ -616,10 +616,17 @@ export const ManageLayers = () => {
 
             const traitsForGeneration = Object.keys(selectedTraits)
                 .filter(layer => layer.toLowerCase() !== 'body')
-                .map(layer => ({
-                    category: layer,
-                    imageData: selectedTraits[layer].imageUrl
-                }));
+                .map(layer => {
+                    const trait = selectedTraits[layer];
+                    return {
+                        id: trait.id, // Send ID if available
+                        category: layer,
+                        // Only send imageData if we don't have an ID
+                        // Or maybe send it anyway if it's small? 
+                        // To solve 413, we MUST NOT send it if we have ID.
+                        imageData: trait.id ? undefined : trait.imageUrl
+                    };
+                });
 
             console.log("  - Base image:", baseImage?.substring(0, 50) + "...");
             console.log("  - Traits to composite:", traitsForGeneration.length);
@@ -628,6 +635,7 @@ export const ManageLayers = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    projectId, // Add projectId context
                     baseImage,
                     traits: traitsForGeneration
                 })

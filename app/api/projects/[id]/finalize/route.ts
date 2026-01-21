@@ -39,6 +39,7 @@ export async function POST(
             position: { x: 0, y: 0, width: 1024, height: 1024 },
             aiPrompt: `Background for ${config.subject}`,
             traits: bgTraits.length > 0 ? bgTraits.map(t => ({
+                id: t.id,
                 name: t.description,
                 rarity: 100 / bgTraits.length,
                 imageUrl: `data:image/png;base64,${t.imageData}`,
@@ -74,6 +75,7 @@ export async function POST(
                     position: { x: 0, y: 0, width: 1024, height: 1024 },
                     aiPrompt: `${category} for ${config.subject}`,
                     traits: categoryTraits.map(t => ({
+                        id: t.id,
                         name: t.description,
                         rarity: 100 / categoryTraits.length,
                         imageUrl: `data:image/png;base64,${t.imageData}`,
