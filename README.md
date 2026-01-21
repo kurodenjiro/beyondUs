@@ -1,6 +1,6 @@
 # BeyondUs: The AI-Native NFT Foundry on Cronos
 
-![BeyondUs](/logo.png)
+
 
 **BeyondUs** is a next-generation NFT creation platform that democratizes onchain asset creation by merging advanced Generative AI with high-throughput EVM chains. We allow anyone—regardless of artistic ability—to turn a single image or text prompt into a fully deployed, immutable NFT collection in minutes.
 
