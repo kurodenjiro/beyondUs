@@ -610,9 +610,6 @@ export const ManageLayers = () => {
 
         try {
             console.log("📸 Step 1: Generating NFT image...");
-            // 1. Generate the NFT image
-            const baseNode = nodes.find(n => n.data.label.toLowerCase() === "body");
-            const baseImage = selectedTraits[baseNode?.data.label]?.imageUrl || baseNode?.data.traits[0]?.imageUrl;
 
             const traitsForGeneration = Object.keys(selectedTraits)
                 .filter(layer => layer.toLowerCase() !== 'body')
@@ -622,21 +619,17 @@ export const ManageLayers = () => {
                         id: trait.id, // Send ID if available
                         category: layer,
                         // Only send imageData if we don't have an ID
-                        // Or maybe send it anyway if it's small? 
-                        // To solve 413, we MUST NOT send it if we have ID.
                         imageData: trait.id ? undefined : trait.imageUrl
                     };
                 });
 
-            console.log("  - Base image:", baseImage?.substring(0, 50) + "...");
             console.log("  - Traits to composite:", traitsForGeneration.length);
 
             const response = await fetch('/api/preview-nft', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    projectId, // Add projectId context
-                    baseImage,
+                    projectId, // Server will fetch base image from project layers
                     traits: traitsForGeneration
                 })
             });

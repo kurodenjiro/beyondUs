@@ -6,38 +6,45 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
     try {
-        const { baseImage, traits, projectId } = await request.json();
+        const { traits, projectId } = await request.json();
 
-        if (!baseImage || !traits) {
-            return NextResponse.json({ error: 'Missing baseImage or traits' }, { status: 400 });
+        if (!projectId || !traits) {
+            return NextResponse.json({ error: 'Missing projectId or traits' }, { status: 400 });
         }
 
-        console.log(`🎨 Generating preview with ${traits.length} traits...`);
+        console.log(`🎨 Generating preview for project ${projectId} with ${traits.length} traits...`);
 
-        // Prepare traits for composite function
-        // Expecting traits to have { category: string, imageData?: string, id?: string }
-        // If imageData is missing but id is present, fetch from DB
+        // Fetch project to get base image from Body layer
+        const project = await prisma.project.findUnique({
+            where: { id: projectId }
+        });
+
+        if (!project || !project.layers) {
+            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        const layers = project.layers as any[];
+        const bodyLayer = layers.find(l => l.name === "Body");
+
+        if (!bodyLayer || !bodyLayer.traits || bodyLayer.traits.length === 0) {
+            return NextResponse.json({ error: 'Base character not found in project' }, { status: 404 });
+        }
 
         // Helper to ensure base64
-        const ensureBase64 = async (img: string) => {
-            if (img.startsWith('http')) {
-                const res = await fetch(img);
-                const buffer = await res.arrayBuffer();
-                return Buffer.from(buffer).toString('base64');
-            }
+        const ensureBase64 = (img: string) => {
             return img.replace(/^data:image\/\w+;base64,/, '');
         };
 
-        const cleanBaseImage = await ensureBase64(baseImage);
+        // Get base image from Body layer
+        const baseImageUrl = bodyLayer.traits[0].imageUrl;
+        const cleanBaseImage = ensureBase64(baseImageUrl);
 
         // Fetch traits if needed
         const cleanTraits = await Promise.all(traits.map(async (t: any) => {
             let imageData = t.imageUrl || t.imageData;
 
-            // If we have an ID but no image data (or just want to be safe), fetch from DB
+            // If we have an ID but no image data, fetch from DB
             if (t.id && (!imageData || imageData.length < 100)) {
-                // Fetch from DB if projectId is available (actually t.id should be unique globally)
-                // But we can just use findUnique on ProjectTrait
                 const dbTrait = await prisma.projectTrait.findUnique({
                     where: { id: t.id }
                 });
@@ -50,13 +57,12 @@ export async function POST(request: NextRequest) {
             }
 
             if (!imageData) {
-                // Skip this trait if no data found
                 return null;
             }
 
             return {
                 category: t.category.toLowerCase(),
-                imageData: await ensureBase64(imageData)
+                imageData: ensureBase64(imageData)
             };
         }));
 
