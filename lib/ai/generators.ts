@@ -22,6 +22,23 @@ export interface GeneratedTrait {
     imageData: string; // base64
 }
 
+// Helper to retry generation on 503 Overloaded
+async function generateWithRetry(model: string, params: any, retries = 3, delay = 2000): Promise<any> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await ai.models.generateContent({ model, ...params });
+        } catch (error: any) {
+            const isOverloaded = error.message?.includes('503') || error.status === 503 || error.code === 503;
+            if (isOverloaded && i < retries - 1) {
+                console.warn(`⚠️ Model overloaded (attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential backoff
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
 // Parse prompt to config using AI
 export async function parsePromptToConfig(prompt: string): Promise<NFTConfig> {
     const aiPrompt = `Analyze this NFT collection prompt and extract configuration details.
@@ -39,8 +56,7 @@ Provide a JSON response with:
 }`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+        const response = await generateWithRetry("gemini-2.0-flash-exp", {
             contents: {
                 role: "user",
                 parts: [{ text: aiPrompt }]
@@ -102,8 +118,7 @@ CRITICAL REQUIREMENTS - CLEAN BASE ONLY:
 7. Professional NFT quality
 8. Centered composition, portrait orientation`;
 
-    const response = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
+    const response = await generateWithRetry("gemini-3-pro-image-preview", {
         contents: {
             role: "user",
             parts: [{ text: prompt }]
@@ -114,7 +129,7 @@ CRITICAL REQUIREMENTS - CLEAN BASE ONLY:
         }
     });
 
-    const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data);
+    const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData?.data);
     if (!imagePart || !imagePart.inlineData?.data) {
         throw new Error("Failed to generate NFT sample");
     }
@@ -150,8 +165,7 @@ EXAMPLES:
 OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-image-preview",
+        const response = await generateWithRetry("gemini-3-pro-image-preview", {
             contents: {
                 role: "user",
                 parts: [{ text: prompt }]
@@ -162,7 +176,7 @@ OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
             }
         });
 
-        const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data);
+        const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData?.data);
         if (!imagePart || !imagePart.inlineData?.data) return null;
 
         return {
@@ -171,7 +185,10 @@ OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
             imageData: imagePart.inlineData.data
         };
     } catch (error) {
-        console.error(`Failed to generate ${category} ${variationNumber}`);
+        console.error(`Failed to generate ${category} ${variationNumber}`, error);
+
+        // Fallback to simpler model if configured or desired, but usually retry handles it.
+        // For now just logging error nicely.
         return null;
     }
 }
