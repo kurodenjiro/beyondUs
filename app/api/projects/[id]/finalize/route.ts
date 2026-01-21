@@ -8,26 +8,31 @@ interface TraitInput {
     imageData: string;
 }
 
+// Use params context correctly for Next.js 13+ app directory dynamic routes
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
-        const { baseImageData, traits, config, nftsToGenerate = 5 } = await request.json();
+        const { baseImageData, config, nftsToGenerate = 5 } = await request.json();
 
-        if (!baseImageData || !traits || !config) {
+        if (!baseImageData || !config) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
-        const generatedTraits = traits as TraitInput[];
-        console.log(`🚀 Finalizing project ${id} with ${generatedTraits.length} traits`);
+        // Fetch generated traits from DB
+        const projectTraits = await prisma.projectTrait.findMany({
+            where: { projectId: id }
+        });
+
+        console.log(`🚀 Finalizing project ${id} with ${projectTraits.length} traits from DB`);
 
         // 1. Create Layers Structure
         const layerMap = new Map<string, any>();
 
         // Background Layer
-        const bgTraits = generatedTraits.filter(t => t.category === "background");
+        const bgTraits = projectTraits.filter(t => t.category === "background");
         layerMap.set("Background", {
             name: "Background",
             parentLayer: "",
@@ -60,7 +65,7 @@ export async function POST(
         // Other Layers
         const categories = ["clothing", "accessory", "headwear", "eyewear"];
         categories.forEach(category => {
-            const categoryTraits = generatedTraits.filter(t => t.category === category);
+            const categoryTraits = projectTraits.filter(t => t.category === category);
             if (categoryTraits.length > 0) {
                 const displayName = category.charAt(0).toUpperCase() + category.slice(1);
                 layerMap.set(displayName, {
@@ -88,10 +93,10 @@ export async function POST(
         for (let i = 1; i <= nftsToGenerate; i++) {
             // Randomly select one trait per category
             const selectedTraits = allCategories.map(cat => {
-                const categoryTraits = generatedTraits.filter(t => t.category === cat);
+                const categoryTraits = projectTraits.filter(t => t.category === cat);
                 if (categoryTraits.length === 0) return null;
                 return categoryTraits[Math.floor(Math.random() * categoryTraits.length)];
-            }).filter(Boolean) as TraitInput[];
+            }).filter((t): t is typeof projectTraits[0] => t !== null);
 
             const traitsToComposite = selectedTraits.map(t => ({
                 category: t.category,

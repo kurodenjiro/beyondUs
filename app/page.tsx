@@ -111,14 +111,14 @@ export default function Home() {
         });
       }
 
-      // 4. Finalize
+      // 4. Finalize (server fetches traits from DB)
       setStatus("FINALIZING RELEASE...");
       const finalizeRes = await fetch(`/api/projects/${projectId}/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseImageData,
-          traits: generatedTraits,
+          // Traits are fetched from DB by server
           config,
           nftsToGenerate: supply
         })

@@ -136,6 +136,7 @@ model Project {
   ipfsHash        String?
   contractAddress String?
   nfts            Nft[]
+  traits          ProjectTrait[]
 }
 
 model Nft {
@@ -151,4 +152,16 @@ model Nft {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectTrait {
+  id          String   @id @default(cuid())
+  projectId   String
+  category    String
+  description String
+  imageData   String   // Base64 or URL
+  createdAt   DateTime @default(now())
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, category])
 }

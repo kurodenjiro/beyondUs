@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { generateTrait } from '@/lib/ai/generators';
 
 // Use params context correctly for Next.js 13+ app directory dynamic routes
@@ -21,9 +22,22 @@ export async function POST(
             throw new Error(`Failed to generate trait for ${category}`);
         }
 
+        // Save to DB
+        const savedTrait = await prisma.projectTrait.create({
+            data: {
+                projectId: id,
+                category: trait.category,
+                description: trait.description,
+                imageData: trait.imageData
+            }
+        });
+
         return NextResponse.json({
             success: true,
-            trait
+            trait: {
+                ...trait,
+                id: savedTrait.id
+            }
         });
 
     } catch (error: any) {
