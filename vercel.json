@@ -1,0 +1,18 @@
+{
+    "functions": {
+        "app/api/preview-nft/route.ts": {
+            "maxDuration": 60,
+            "memory": 1024
+        },
+        "app/api/projects/[id]/finalize/route.ts": {
+            "maxDuration": 300,
+            "memory": 1024
+        },
+        "app/api/projects/[id]/generate-trait/route.ts": {
+            "maxDuration": 60
+        },
+        "app/api/projects/[id]/generate-base/route.ts": {
+            "maxDuration": 60
+        }
+    }
+}
