@@ -139,6 +139,18 @@ CRITICAL REQUIREMENTS - CLEAN BASE ONLY:
 
 // Generate trait
 export async function generateTrait(category: string, config: NFTConfig, variationNumber: number): Promise<GeneratedTrait | null> {
+    // Customize prompt based on category
+    let typeSpecificRequirements = "";
+    if (category.toLowerCase() === 'background') {
+        typeSpecificRequirements = `
+4. Full opaque coverage (NO transparency)
+5. Atmospheric or abstract design that fits the theme`;
+    } else {
+        typeSpecificRequirements = `
+4. Transparent background (CRITICAL)
+5. Clearly defined edges`;
+    }
+
     const prompt = `Generate a single ${category} trait for an NFT character.
 
 STYLE TO MATCH:
@@ -148,11 +160,10 @@ STYLE TO MATCH:
 - Color Palette: ${config.colorPalette.join(", ")}
 
 REQUIREMENTS:
-1. Create ONLY the ${category} item (not the full character)
+1. Create ONLY the ${category} item
 2. Match the art style exactly
 3. Use the specified color palette
-4. Transparent or solid background
-5. Professional NFT quality
+${typeSpecificRequirements}
 6. Variation ${variationNumber} - make it unique
 
 EXAMPLES:
@@ -162,7 +173,7 @@ EXAMPLES:
 - accessory: chain, earring, watch, badge
 - clothing: shirt, jacket, vest, hoodie
 
-OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
+OUTPUT: Just the ${category} item, ready to be composited.`;
 
     try {
         const response = await generateWithRetry("gemini-3-pro-image-preview", {
@@ -177,7 +188,11 @@ OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
         });
 
         const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData?.data);
-        if (!imagePart || !imagePart.inlineData?.data) return null;
+
+        if (!imagePart || !imagePart.inlineData?.data) {
+            console.error(`Generation failed for ${category} ${variationNumber}. Response:`, JSON.stringify(response, null, 2));
+            return null;
+        }
 
         return {
             category,
@@ -186,9 +201,6 @@ OUTPUT: Just the ${category} item, ready to be composited onto a character.`;
         };
     } catch (error) {
         console.error(`Failed to generate ${category} ${variationNumber}`, error);
-
-        // Fallback to simpler model if configured or desired, but usually retry handles it.
-        // For now just logging error nicely.
         return null;
     }
 }
